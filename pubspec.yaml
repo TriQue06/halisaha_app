@@ -1,0 +1,43 @@
+name: rakipvar
+description: "RakipVar - İzmir halı saha maç ve kaleci bulma uygulaması."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Backend & Veritabanı (Supabase)
+  supabase_flutter: ^2.3.4
+  
+  # Google ile Giriş
+  google_sign_in: ^6.2.1
+
+  # State Management (Durum Yönetimi)
+  flutter_riverpod: ^2.5.1
+
+  # Reklam Entegrasyonu (AdMob)
+  # NOT: 5.x sürümü Flutter 3.47'nin Gradle'ıyla derlenmiyor
+  # ("Could not get unknown property 'all' for configuration container").
+  # 9.x bu sorunu çözüyor; henüz reklam kodu yazılmadığı için API farkı önemsiz.
+  google_mobile_ads: ^9.1.0
+
+  # Yardımcı Paketler (Telefon Arama, Tarih & Ayarlar)
+  url_launcher: ^6.2.5
+  intl: 0.20.3
+  shared_preferences: ^2.2.3
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
