@@ -1,4 +1,4 @@
-package com.rakipvar.rakipvar
+package com.japonkale.app
 
 import io.flutter.embedding.android.FlutterActivity
 
