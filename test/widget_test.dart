@@ -1,10 +1,13 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:rakipvar/core/constants/izmir_districts.dart';
-import 'package:rakipvar/main.dart';
+import 'package:rakipvar/features/shell/main_shell.dart';
 import 'package:rakipvar/models/models.dart';
 import 'package:rakipvar/state/app_providers.dart';
+import 'package:rakipvar/state/auth_controller.dart';
 
 PendingMatch _match({
   required MatchStatus status,
@@ -157,8 +160,42 @@ void main() {
     });
   });
 
-  testWidgets('Uygulama açılır ve 5 sekme görünür', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: RakipVarApp()));
+  group('Telefon numarası normalizasyonu', () {
+    test('farklı yazımlar tek E.164 biçimine indirgenir', () {
+      const String expected = '+905321112233';
+      for (final String input in <String>[
+        '0532 111 22 33',
+        '532 111 22 33',
+        '5321112233',
+        '05321112233',
+        '+90 532 111 22 33',
+        '90 532 111 22 33',
+        '0090 532 111 22 33',
+        '(0532) 111-22-33',
+      ]) {
+        expect(AuthController.normalizePhone(input), expected, reason: 'girdi: $input');
+      }
+    });
+  });
+
+  testWidgets('Ana kabuk açılır ve 5 sekme görünür', (WidgetTester tester) async {
+    // RakipVarApp yerine doğrudan MainShell'i çalıştırıyoruz: RakipVarApp
+    // artık AuthGate üzerinden Supabase.instance'a bağlı ve widget testinde
+    // gerçek bir Supabase oturumu başlatmak istemiyoruz.
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          locale: Locale('tr', 'TR'),
+          supportedLocales: <Locale>[Locale('tr', 'TR')],
+          localizationsDelegates: <LocalizationsDelegate<dynamic>>[
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: MainShell(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('RakipVar'), findsOneWidget);

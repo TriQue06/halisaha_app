@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../state/auth_controller.dart';
 import '../../state/settings_controller.dart';
 
 /// Ayarlar sekmesi: tema, yazı boyutu ve bildirim tercihleri.
@@ -87,11 +88,33 @@ class SettingsScreen extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.logout_rounded),
                 title: const Text('Çıkış Yap'),
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Supabase auth.signOut() burada çağrılacak.')),
-                ),
+                onTap: () => _confirmSignOut(context, ref),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Çıkış onayı. Onaylanırsa oturum kapanır ve [AuthGate] giriş ekranına döner.
+  void _confirmSignOut(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Çıkış yap'),
+        content: const Text('Hesabından çıkmak istediğine emin misin?'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await ref.read(authControllerProvider).signOut();
+            },
+            child: const Text('Çıkış Yap'),
           ),
         ],
       ),

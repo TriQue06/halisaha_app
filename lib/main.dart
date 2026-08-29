@@ -4,20 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
-import 'features/shell/main_shell.dart';
+import 'features/auth/auth_gate.dart';
 import 'state/settings_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Türkçe tarih/ay isimleri için yerelleştirme verisini yükle.
   await initializeDateFormatting('tr_TR');
 
-  // Supabase Veritabanı Bağlantısı
   await Supabase.initialize(
-    url: 'https://giyazjlrwljsujgczrua.supabase.co',
-    publishableKey: 'sb_publishable_pC2I71cFNRVnwzPsw0Ugng_p4wQRXGR',
+    url: AppConfig.supabaseUrl,
+    publishableKey: AppConfig.supabasePublishableKey,
   );
 
   runApp(const ProviderScope(child: RakipVarApp()));
@@ -51,7 +51,8 @@ class RakipVarApp extends ConsumerWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const MainShell(),
+      // Oturum durumuna göre giriş / profil tamamlama / ana ekran.
+      home: const AuthGate(),
     );
   }
 }
