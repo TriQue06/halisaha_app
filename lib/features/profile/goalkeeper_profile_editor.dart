@@ -32,10 +32,11 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
   void initState() {
     super.initState();
     final Goalkeeper? existing = ref.read(myGoalkeeperProvider);
-    final UserProfile user = ref.read(currentUserProvider);
+    final UserProfile? user = ref.read(currentUserProvider);
 
     _aboutController = TextEditingController(text: existing?.about ?? '');
-    _phoneController = TextEditingController(text: existing?.phone ?? user.phone);
+    _phoneController =
+        TextEditingController(text: existing?.phone ?? user?.phone ?? '');
     _selectedDistricts = <String>{...?existing?.districts};
     _isAvailable = existing?.isAvailable ?? true;
   }
@@ -72,7 +73,7 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final UserProfile user = ref.watch(currentUserProvider);
+    final UserProfile? user = ref.watch(currentUserProvider);
     final Goalkeeper? existing = ref.watch(myGoalkeeperProvider);
 
     final Widget body = Form(
@@ -89,9 +90,7 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
                     CircleAvatar(
                       radius: 44,
                       backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                      foregroundImage: (existing?.avatarUrl?.isNotEmpty ?? false)
-                          ? NetworkImage(existing!.avatarUrl!)
-                          : null,
+                      foregroundImage: _avatarImage(existing, user),
                       child: Icon(
                         Icons.sports_mma_rounded,
                         size: 40,
@@ -123,11 +122,11 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  user.fullName,
+                  user?.fullName.isNotEmpty ?? false ? user!.fullName : '—',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 Text(
-                  '${user.age} yaşında',
+                  user?.age == null ? 'Yaş bilgisi yok' : '${user!.age} yaşında',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
@@ -263,6 +262,15 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
       body: body,
     );
   }
+}
+
+/// Kaleci profilinde fotoğraf: önce kaleci profilininki, yoksa hesabınki
+/// (Google ile girenlerde bu dolu gelir).
+ImageProvider<Object>? _avatarImage(Goalkeeper? existing, UserProfile? user) {
+  final String? url = (existing?.avatarUrl?.isNotEmpty ?? false)
+      ? existing!.avatarUrl
+      : ((user?.avatarUrl?.isNotEmpty ?? false) ? user!.avatarUrl : null);
+  return url == null ? null : NetworkImage(url);
 }
 
 class _FieldLabel extends StatelessWidget {

@@ -22,7 +22,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final UserProfile user = ref.watch(currentUserProvider);
+    final UserProfile? user = ref.watch(currentUserProvider);
     final List<Pitch> popular = ref.watch(popularPitchesProvider);
     final Goalkeeper? myGoalkeeper = ref.watch(myGoalkeeperProvider);
     final List<CalendarEvent> events = ref.watch(calendarEventsProvider);
@@ -116,7 +116,7 @@ class HomeScreen extends ConsumerWidget {
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({required this.user});
 
-  final UserProfile user;
+  final UserProfile? user;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +142,7 @@ class _HomeHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Merhaba, ${user.firstName}',
+                  user == null ? 'Merhaba' : 'Merhaba, ${user!.firstName}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -151,7 +151,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 const Text(
-                  'RakipVar',
+                  'Japon Kale',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 26,

@@ -66,26 +66,49 @@ class UserProfile {
     required this.id,
     required this.firstName,
     required this.lastName,
-    required this.birthDate,
     required this.phone,
+    this.birthDate,
     this.avatarUrl,
+    this.district,
   });
+
+  /// Supabase `profiles` tablosundan gelen satırı modele çevirir.
+  factory UserProfile.fromRow(Map<String, dynamic> row) {
+    final String? birth = row['birth_date'] as String?;
+    return UserProfile(
+      id: row['id'] as String,
+      firstName: (row['first_name'] as String?)?.trim() ?? '',
+      lastName: (row['last_name'] as String?)?.trim() ?? '',
+      phone: (row['phone'] as String?) ?? '',
+      birthDate: birth == null ? null : DateTime.tryParse(birth),
+      avatarUrl: (row['avatar_url'] as String?)?.isNotEmpty ?? false
+          ? row['avatar_url'] as String
+          : null,
+      district: row['district'] as String?,
+    );
+  }
 
   final String id;
   final String firstName;
   final String lastName;
-  final DateTime birthDate;
   final String phone;
+
+  /// Google ve telefon girişinde gelmeyebilir; profil tamamlanana kadar null.
+  final DateTime? birthDate;
   final String? avatarUrl;
+  final String? district;
 
-  String get fullName => '$firstName $lastName';
+  String get fullName => '$firstName $lastName'.trim();
 
-  /// Doğum tarihinden hesaplanan yaş.
-  int get age {
+  /// Doğum tarihinden hesaplanan yaş; tarih yoksa null.
+  int? get age {
+    final DateTime? birth = birthDate;
+    if (birth == null) return null;
+
     final DateTime now = DateTime.now();
-    int years = now.year - birthDate.year;
-    final bool hadBirthday = now.month > birthDate.month ||
-        (now.month == birthDate.month && now.day >= birthDate.day);
+    int years = now.year - birth.year;
+    final bool hadBirthday =
+        now.month > birth.month || (now.month == birth.month && now.day >= birth.day);
     if (!hadBirthday) years--;
     return years;
   }

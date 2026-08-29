@@ -2,13 +2,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
+import 'auth_controller.dart';
 
 // =====================================================================
-// KULLANICI
+// KULLANICI  (gerçek Supabase oturumundan gelir, mock değil)
 // =====================================================================
 
-final Provider<UserProfile> currentUserProvider =
-    Provider<UserProfile>((Ref ref) => MockData.currentUser);
+/// Giriş yapmış kullanıcının id'si. Oturum yoksa null.
+final Provider<String?> currentUserIdProvider =
+    Provider<String?>((Ref ref) => ref.watch(sessionProvider)?.user.id);
+
+/// Giriş yapmış kullanıcının profili.
+///
+/// `profiles` tablosundan gelir. Profil henüz yüklenmediyse null döner;
+/// [AuthGate] eksiksiz profil olmadan ana kabuğu göstermediği için
+/// sekmelerin içinde pratikte null olmaz.
+final Provider<UserProfile?> currentUserProvider = Provider<UserProfile?>((Ref ref) {
+  final Map<String, dynamic>? row = ref.watch(myProfileProvider).valueOrNull;
+  return row == null ? null : UserProfile.fromRow(row);
+});
 
 // =====================================================================
 // HALI SAHALAR
@@ -58,7 +70,7 @@ class TeamsController extends Notifier<List<Team>> {
     final Team team = Team(
       id: 't-${DateTime.now().millisecondsSinceEpoch}',
       pitchId: pitchId,
-      captainId: MockData.currentUserId,
+      captainId: ref.read(currentUserIdProvider) ?? '',
       name: name,
       contactPhone: contactPhone,
     );
@@ -85,7 +97,8 @@ final ProviderFamily<List<Team>, String> teamsForPitchProvider =
 /// kullanıcının o sahada kayıtlı takımı yoksa buton gizlenir.
 final ProviderFamily<Team?, String> myTeamForPitchProvider =
     Provider.family<Team?, String>((Ref ref, String pitchId) {
-  final String uid = ref.watch(currentUserProvider).id;
+  final String? uid = ref.watch(currentUserIdProvider);
+  if (uid == null) return null;
   for (final Team team in ref.watch(teamsProvider)) {
     if (team.pitchId == pitchId && team.captainId == uid) return team;
   }
@@ -94,7 +107,8 @@ final ProviderFamily<Team?, String> myTeamForPitchProvider =
 
 /// Kullanıcının kaptanı olduğu tüm takımlar.
 final Provider<List<Team>> myTeamsProvider = Provider<List<Team>>((Ref ref) {
-  final String uid = ref.watch(currentUserProvider).id;
+  final String? uid = ref.watch(currentUserIdProvider);
+  if (uid == null) return const <Team>[];
   return ref.watch(teamsProvider).where((Team t) => t.captainId == uid).toList(growable: false);
 });
 
@@ -134,11 +148,12 @@ class MyGoalkeeperController extends Notifier<Goalkeeper?> {
     String? avatarUrl,
     bool isAvailable = true,
   }) {
-    final UserProfile user = ref.read(currentUserProvider);
+    final UserProfile? user = ref.read(currentUserProvider);
+    if (user == null) return;
     state = Goalkeeper(
       id: user.id,
       fullName: user.fullName,
-      age: user.age,
+      age: user.age ?? 0,
       districts: districts,
       about: about,
       phone: phone,

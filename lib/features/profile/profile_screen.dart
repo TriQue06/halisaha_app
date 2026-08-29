@@ -16,7 +16,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final UserProfile user = ref.watch(currentUserProvider);
+    final UserProfile? user = ref.watch(currentUserProvider);
 
     return DefaultTabController(
       length: 2,
@@ -58,7 +58,8 @@ class ProfileScreen extends ConsumerWidget {
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({required this.user});
 
-  final UserProfile user;
+  /// Profil henüz yüklenmediyse null; alanlar yer tutucu gösterir.
+  final UserProfile? user;
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +82,9 @@ class _ProfileHeader extends StatelessWidget {
           CircleAvatar(
             radius: 32,
             backgroundColor: Colors.white.withValues(alpha: 0.18),
-            foregroundImage: (user.avatarUrl?.isNotEmpty ?? false)
-                ? NetworkImage(user.avatarUrl!)
+            // Google ile girenlerde profil fotoğrafı buradan gelir.
+            foregroundImage: (user?.avatarUrl?.isNotEmpty ?? false)
+                ? NetworkImage(user!.avatarUrl!)
                 : null,
             child: const Icon(Icons.person_rounded, size: 34, color: Colors.white),
           ),
@@ -93,7 +95,7 @@ class _ProfileHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  user.fullName,
+                  user?.fullName.isNotEmpty ?? false ? user!.fullName : 'Profil yükleniyor...',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -105,11 +107,16 @@ class _ProfileHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 _HeaderInfoRow(
                   icon: Icons.cake_outlined,
-                  text: '${DateFormat('d MMMM yyyy', 'tr_TR').format(user.birthDate)}'
-                      ' · ${user.age} yaşında',
+                  text: user?.birthDate == null
+                      ? 'Doğum tarihi eklenmemiş'
+                      : '${DateFormat('d MMMM yyyy', 'tr_TR').format(user!.birthDate!)}'
+                          ' · ${user!.age} yaşında',
                 ),
                 const SizedBox(height: 2),
-                _HeaderInfoRow(icon: Icons.phone_outlined, text: user.phone),
+                _HeaderInfoRow(
+                  icon: Icons.phone_outlined,
+                  text: user?.phone.isNotEmpty ?? false ? user!.phone : '—',
+                ),
               ],
             ),
           ),

@@ -414,7 +414,7 @@ class _CreateTeamSheetState extends ConsumerState<_CreateTeamSheet> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   late final TextEditingController _phoneController =
-      TextEditingController(text: ref.read(currentUserProvider).phone);
+      TextEditingController(text: ref.read(currentUserProvider)?.phone ?? '');
 
   @override
   void dispose() {

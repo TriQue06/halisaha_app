@@ -20,18 +20,18 @@ Future<void> main() async {
     publishableKey: AppConfig.supabasePublishableKey,
   );
 
-  runApp(const ProviderScope(child: RakipVarApp()));
+  runApp(const ProviderScope(child: JaponKaleApp()));
 }
 
-class RakipVarApp extends ConsumerWidget {
-  const RakipVarApp({super.key});
+class JaponKaleApp extends ConsumerWidget {
+  const JaponKaleApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppSettings settings = ref.watch(settingsProvider);
 
     return MaterialApp(
-      title: 'RakipVar',
+      title: 'Japon Kale',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

@@ -3,11 +3,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:rakipvar/core/constants/izmir_districts.dart';
-import 'package:rakipvar/features/shell/main_shell.dart';
-import 'package:rakipvar/models/models.dart';
-import 'package:rakipvar/state/app_providers.dart';
-import 'package:rakipvar/state/auth_controller.dart';
+import 'package:japonkale/core/constants/izmir_districts.dart';
+import 'package:japonkale/features/shell/main_shell.dart';
+import 'package:japonkale/models/models.dart';
+import 'package:japonkale/state/app_providers.dart';
+import 'package:japonkale/state/auth_controller.dart';
 
 PendingMatch _match({
   required MatchStatus status,
@@ -179,12 +179,27 @@ void main() {
   });
 
   testWidgets('Ana kabuk açılır ve 5 sekme görünür', (WidgetTester tester) async {
-    // RakipVarApp yerine doğrudan MainShell'i çalıştırıyoruz: RakipVarApp
+    // JaponKaleApp yerine doğrudan MainShell'i çalıştırıyoruz: JaponKaleApp
     // artık AuthGate üzerinden Supabase.instance'a bağlı ve widget testinde
     // gerçek bir Supabase oturumu başlatmak istemiyoruz.
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
+      ProviderScope(
+        // MainShell artık gerçek kullanıcıyı Supabase oturumundan okuyor.
+        // Testte Supabase başlatılmadığı için kullanıcı sağlayıcılarını
+        // sabit bir profille değiştiriyoruz.
+        overrides: <Override>[
+          currentUserIdProvider.overrideWithValue('test-user'),
+          currentUserProvider.overrideWithValue(
+            UserProfile(
+              id: 'test-user',
+              firstName: 'Test',
+              lastName: 'Kullanıcı',
+              phone: '+905000000000',
+              birthDate: DateTime(1995, 4, 12),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
           locale: Locale('tr', 'TR'),
           supportedLocales: <Locale>[Locale('tr', 'TR')],
           localizationsDelegates: <LocalizationsDelegate<dynamic>>[
@@ -198,7 +213,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('RakipVar'), findsOneWidget);
+    expect(find.text('Japon Kale'), findsOneWidget);
     expect(find.text('Ana Sayfa'), findsOneWidget);
     expect(find.text('Sahalar'), findsOneWidget);
     expect(find.text('Kaleciler'), findsOneWidget);

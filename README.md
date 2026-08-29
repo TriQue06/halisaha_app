@@ -1,4 +1,4 @@
-# RakipVar ⚽
+# Japon Kale ⚽
 
 İzmir için halı saha maç ayarlama ve kaleci bulma uygulaması.
 

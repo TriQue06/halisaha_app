@@ -11,17 +11,12 @@ abstract final class MockData {
       DateTime(_now.year, _now.month, _now.day + days, hour, minute);
 
   // -------------------------------------------------------------------
-  // Kullanıcı
+  // Örnek takım kaptanı
   // -------------------------------------------------------------------
-  static const String currentUserId = 'u-001';
-
-  static final UserProfile currentUser = UserProfile(
-    id: currentUserId,
-    firstName: 'Barış',
-    lastName: 'Tanlık',
-    birthDate: DateTime(1995, 4, 12),
-    phone: '+90 532 111 22 33',
-  );
+  // Not: Gerçek kullanıcı artık Supabase oturumundan geliyor
+  // (currentUserProvider). Buradaki id yalnızca örnek takımların
+  // bir sahibi olsun diye duruyor; giriş yapan kullanıcıyla eşleşmez.
+  static const String demoCaptainId = 'u-001';
 
   // -------------------------------------------------------------------
   // Halı sahalar
@@ -130,7 +125,7 @@ abstract final class MockData {
     Team(
       id: 't-01',
       pitchId: 'p-01',
-      captainId: currentUserId,
+      captainId: demoCaptainId,
       name: 'Bornova Kartalları',
       contactPhone: '+90 532 111 22 33',
       wins: 12,

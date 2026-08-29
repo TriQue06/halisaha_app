@@ -44,7 +44,7 @@ class AuthHeader extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               const Text(
-                'RakipVar',
+                'Japon Kale',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,

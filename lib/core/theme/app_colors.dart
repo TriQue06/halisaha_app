@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// RakipVar renk paleti.
+/// Japon Kale renk paleti.
 ///
 /// Açık tema  : Koyu yeşil + beyaz
 /// Koyu tema  : Koyu yeşil + koyu gri / siyah
