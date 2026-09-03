@@ -66,5 +66,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Push bildirimi: uygulama arka plandayken/kapaliyken gelen sessiz
+	     bildirimlerin islenebilmesi icin gerekli. Bu anahtar olmadan
+	     firebase_messaging arka plan mesajlarini alamaz. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>fetch</string>
+	</array>
+	<!-- url_launcher ile telefon araması (tel:) için gerekli -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+	</array>
 </dict>
 </plist>

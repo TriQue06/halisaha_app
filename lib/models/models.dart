@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 // =====================================================================
 // ENUM'LAR  (Supabase şemasındaki enum tipleriyle birebir eşleşir)
@@ -131,6 +132,24 @@ class Pitch {
     this.description = '',
   });
 
+  /// `pitches_with_team_count` view'ından gelen satırı modele çevirir.
+  factory Pitch.fromRow(Map<String, dynamic> row) {
+    return Pitch(
+      id: row['id'] as String,
+      name: (row['name'] as String?) ?? '',
+      district: (row['district'] as String?) ?? '',
+      address: (row['address'] as String?) ?? '',
+      phone: (row['phone'] as String?) ?? '',
+      teamCount: (row['team_count'] as num?)?.toInt() ?? 0,
+      imageUrl: row['image_url'] as String?,
+      pricePerHour: (row['price_per_hour'] as num?)?.toDouble(),
+      isIndoor: (row['is_indoor'] as bool?) ?? false,
+      hasParking: (row['has_parking'] as bool?) ?? false,
+      hasShower: (row['has_shower'] as bool?) ?? false,
+      description: (row['description'] as String?) ?? '',
+    );
+  }
+
   final String id;
   final String name;
   final String district;
@@ -193,6 +212,31 @@ class Goalkeeper {
     this.avatarUrl,
     this.isAvailable = true,
   });
+
+  /// `goalkeeper_profiles` view'ından gelen satırı modele çevirir.
+  factory Goalkeeper.fromRow(Map<String, dynamic> row) {
+    final String name = <String?>[
+      row['first_name'] as String?,
+      row['last_name'] as String?,
+    ].whereType<String>().join(' ').trim();
+
+    return Goalkeeper(
+      id: row['id'] as String,
+      fullName: name.isEmpty ? 'İsimsiz kaleci' : name,
+      age: (row['age'] as num?)?.toInt() ?? 0,
+      districts: ((row['districts'] as List<dynamic>?) ?? <dynamic>[])
+          .whereType<String>()
+          .toList(growable: false),
+      about: (row['about'] as String?) ?? '',
+      phone: (row['contact_phone'] as String?) ?? '',
+      rating: (row['rating_avg'] as num?)?.toDouble() ?? 0,
+      ratingCount: (row['rating_count'] as num?)?.toInt() ?? 0,
+      avatarUrl: (row['avatar_url'] as String?)?.isNotEmpty ?? false
+          ? row['avatar_url'] as String
+          : null,
+      isAvailable: (row['is_available'] as bool?) ?? true,
+    );
+  }
 
   final String id;
   final String fullName;
@@ -259,6 +303,7 @@ class PendingMatch {
     required this.id,
     required this.myTeamName,
     required this.opponentTeamName,
+    this.opponentTeamId = '',
     required this.opponentPhone,
     required this.opponentCaptainName,
     required this.pitchName,
@@ -273,6 +318,9 @@ class PendingMatch {
   final String id;
   final String myTeamName;
   final String opponentTeamName;
+
+  /// Saha detayında "bu takımla zaten maçım var mı" kontrolü için.
+  final String opponentTeamId;
 
   /// Yalnızca [PendingMatchStage.confirmed] ve sonrasında UI'da gösterilir.
   final String opponentPhone;
@@ -321,6 +369,11 @@ class PendingMatch {
 
       case MatchStatus.accepted:
         // 2. aşama: iki taraftan en az biri henüz "Maça Hazırım" dememiş.
+        //
+        // acceptedAt null ise süre hesaplanamaz; bu durumda "süresi doldu"
+        // demek yanlış olur — kabul yeni gelmiş demektir. Sunucu tarafında
+        // sayacı zaten cancel_deadline ve auto_cancel_stale_matches() tutuyor.
+        if (acceptedAt == null) return PendingMatchStage.readinessPending;
         return timeLeftForReadiness == Duration.zero
             ? PendingMatchStage.expired
             : PendingMatchStage.readinessPending;
@@ -378,4 +431,101 @@ class CalendarEvent {
   final DateTime date;
   final String title;
   final String subtitle;
+}
+
+// =====================================================================
+// BİLDİRİMLER
+// =====================================================================
+
+/// `notifications` tablosundaki `notification_type` enum'unun Dart karşılığı.
+enum NotificationKind {
+  challengeReceived,
+  challengeAccepted,
+  challengeRejected,
+  matchMutuallyAgreed,
+  matchScheduled,
+  matchResultRequest,
+  matchCompleted,
+  matchAutoCancelled,
+  matchCancelled,
+  goalkeeperRated,
+  generic;
+
+  static NotificationKind fromDb(String? value) => switch (value) {
+        'challenge_received' => NotificationKind.challengeReceived,
+        'challenge_accepted' => NotificationKind.challengeAccepted,
+        'challenge_rejected' => NotificationKind.challengeRejected,
+        'match_mutually_agreed' => NotificationKind.matchMutuallyAgreed,
+        'match_scheduled' => NotificationKind.matchScheduled,
+        'match_result_request' => NotificationKind.matchResultRequest,
+        'match_completed' => NotificationKind.matchCompleted,
+        'match_auto_cancelled' => NotificationKind.matchAutoCancelled,
+        'match_cancelled' => NotificationKind.matchCancelled,
+        'goalkeeper_rated' => NotificationKind.goalkeeperRated,
+        _ => NotificationKind.generic,
+      };
+
+  /// Listede kullanılan ikon.
+  IconData get icon => switch (this) {
+        NotificationKind.challengeReceived => Icons.sports_soccer_rounded,
+        NotificationKind.challengeAccepted => Icons.check_circle_rounded,
+        NotificationKind.challengeRejected => Icons.cancel_rounded,
+        NotificationKind.matchMutuallyAgreed => Icons.handshake_rounded,
+        NotificationKind.matchScheduled => Icons.event_available_rounded,
+        NotificationKind.matchResultRequest => Icons.help_center_rounded,
+        NotificationKind.matchCompleted => Icons.emoji_events_rounded,
+        NotificationKind.matchAutoCancelled => Icons.timer_off_rounded,
+        NotificationKind.matchCancelled => Icons.event_busy_rounded,
+        NotificationKind.goalkeeperRated => Icons.star_rounded,
+        NotificationKind.generic => Icons.notifications_rounded,
+      };
+
+  /// Kullanıcıyı ilgili sekmeye yönlendirmek anlamlı mı?
+  /// Maçla ilgili tüm bildirimler "Profilim → Takımım" sekmesine gider.
+  bool get opensMyTeam => this != NotificationKind.goalkeeperRated &&
+      this != NotificationKind.generic;
+}
+
+@immutable
+class AppNotification {
+  const AppNotification({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.body,
+    required this.isRead,
+    required this.createdAt,
+    this.matchId,
+  });
+
+  factory AppNotification.fromRow(Map<String, dynamic> row) {
+    return AppNotification(
+      id: row['id'] as String,
+      kind: NotificationKind.fromDb(row['type'] as String?),
+      title: (row['title'] as String?) ?? '',
+      body: (row['body'] as String?) ?? '',
+      isRead: (row['is_read'] as bool?) ?? false,
+      createdAt:
+          DateTime.tryParse(row['created_at'] as String? ?? '')?.toLocal() ?? DateTime.now(),
+      matchId: row['match_id'] as String?,
+    );
+  }
+
+  final String id;
+  final NotificationKind kind;
+  final String title;
+  final String body;
+  final bool isRead;
+  final DateTime createdAt;
+  final String? matchId;
+
+  /// "3 dk önce", "2 sa önce", "5 gün önce" biçiminde göreli zaman.
+  String get relativeTime {
+    final Duration diff = DateTime.now().difference(createdAt);
+    if (diff.inMinutes < 1) return 'az önce';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} dk önce';
+    if (diff.inHours < 24) return '${diff.inHours} sa önce';
+    if (diff.inDays < 7) return '${diff.inDays} gün önce';
+    return DateFormat('d MMM yyyy', 'tr_TR').format(createdAt);
+  }
 }

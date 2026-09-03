@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/banner_ad_slot.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
@@ -13,7 +14,12 @@ class PitchesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Pitch> pitches = ref.watch(filteredPitchesProvider);
+    final AsyncValue<List<Pitch>> pitches = ref.watch(filteredPitchesProvider);
+
+    Future<void> refresh() async {
+      ref.invalidate(pitchesProvider);
+      await ref.read(pitchesProvider.future);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -29,19 +35,55 @@ class PitchesScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: pitches.isEmpty
-          ? const EmptyState(
-              icon: Icons.search_off_rounded,
-              title: 'Saha bulunamadı',
-              message: 'Farklı bir isim veya ilçe ile aramayı deneyin.',
-            )
-          : ListView.separated(
+      body: RefreshIndicator(
+        onRefresh: refresh,
+        child: pitches.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (Object error, StackTrace stack) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: <Widget>[
+              const SizedBox(height: 40),
+              EmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: 'Sahalar yüklenemedi',
+                message: error.toString(),
+                action: FilledButton.icon(
+                  onPressed: refresh,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Tekrar Dene'),
+                ),
+              ),
+            ],
+          ),
+          data: (List<Pitch> list) {
+            if (list.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const <Widget>[
+                  SizedBox(height: 40),
+                  EmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: 'Saha bulunamadı',
+                    message: 'Farklı bir isim veya ilçe ile aramayı deneyin.',
+                  ),
+                ],
+              );
+            }
+            // Son eleman reklam yuvası: listenin altında, kartların
+            // arasında değil (saha kartları tıklanabilir).
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-              itemCount: pitches.length,
+              itemCount: list.length + 1,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (BuildContext context, int index) =>
-                  _PitchListTile(pitch: pitches[index]),
-            ),
+                  index == list.length
+                      ? const BannerAdSlot(padding: EdgeInsets.only(top: 8))
+                      : _PitchListTile(pitch: list[index]),
+            );
+          },
+        ),
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import '../../core/constants/izmir_districts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import 'widgets/phone_editor.dart';
 
 /// "Kaleci Profilim" formu.
 ///
@@ -24,19 +25,15 @@ class GoalkeeperProfileEditor extends ConsumerStatefulWidget {
 class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEditor> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _aboutController;
-  late final TextEditingController _phoneController;
   late Set<String> _selectedDistricts;
   late bool _isAvailable;
 
   @override
   void initState() {
     super.initState();
-    final Goalkeeper? existing = ref.read(myGoalkeeperProvider);
-    final UserProfile? user = ref.read(currentUserProvider);
+    final Goalkeeper? existing = ref.read(myGoalkeeperProvider).valueOrNull;
 
     _aboutController = TextEditingController(text: existing?.about ?? '');
-    _phoneController =
-        TextEditingController(text: existing?.phone ?? user?.phone ?? '');
     _selectedDistricts = <String>{...?existing?.districts};
     _isAvailable = existing?.isAvailable ?? true;
   }
@@ -44,8 +41,33 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
   @override
   void dispose() {
     _aboutController.dispose();
-    _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+
+    await ref.read(myGoalkeeperProvider.notifier).save(
+          districts: IzmirDistricts.sorted(_selectedDistricts),
+          about: _aboutController.text.trim(),
+          isAvailable: _isAvailable,
+        );
+
+    if (!mounted) return;
+
+    final AsyncValue<Goalkeeper?> result = ref.read(myGoalkeeperProvider);
+    if (result.hasError) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Kaydedilemedi: ${result.error}')),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Kaleci profiliniz kaydedildi.')),
+    );
+    if (!widget.embedded) navigator.pop();
   }
 
   void _save() {
@@ -57,24 +79,25 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
       return;
     }
 
-    ref.read(myGoalkeeperProvider.notifier).save(
-          districts: IzmirDistricts.sorted(_selectedDistricts),
-          about: _aboutController.text.trim(),
-          phone: _phoneController.text.trim(),
-          isAvailable: _isAvailable,
-        );
+    // Numara olmadan kayıt veritabanı tarafından reddedilir; kullanıcıyı
+    // hata mesajıyla değil, doğrudan numara ekranıyla karşıla.
+    if ((ref.read(currentUserProvider)?.phone ?? '').isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Önce profiline telefon numarası ekle.')),
+      );
+      showPhoneEditor(context);
+      return;
+    }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Kaleci profiliniz kaydedildi.')),
-    );
-    if (!widget.embedded) Navigator.of(context).pop();
+    _submit();
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final UserProfile? user = ref.watch(currentUserProvider);
-    final Goalkeeper? existing = ref.watch(myGoalkeeperProvider);
+    final AsyncValue<Goalkeeper?> myGk = ref.watch(myGoalkeeperProvider);
+    final Goalkeeper? existing = myGk.valueOrNull;
 
     final Widget body = Form(
       key: _formKey,
@@ -204,22 +227,10 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
           const SizedBox(height: 4),
 
           // --- Telefon -------------------------------------------------
+          // Numara elle girilmiyor; profildeki numara kullanılır.
           const _FieldLabel(label: 'İletişim Numarası'),
           const SizedBox(height: 8),
-          TextFormField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.phone_outlined),
-              hintText: '+90 5XX XXX XX XX',
-            ),
-            validator: (String? value) {
-              if (value == null || value.trim().length < 10) {
-                return 'Geçerli bir telefon numarası girin.';
-              }
-              return null;
-            },
-          ),
+          const ContactPhoneNotice(label: 'Kalecilerde görünecek numara'),
           const SizedBox(height: 12),
 
           // --- Müsaitlik ----------------------------------------------
@@ -240,9 +251,10 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
           if (existing != null) ...<Widget>[
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () {
-                ref.read(myGoalkeeperProvider.notifier).delete();
-                ScaffoldMessenger.of(context).showSnackBar(
+              onPressed: () async {
+                final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+                await ref.read(myGoalkeeperProvider.notifier).delete();
+                messenger.showSnackBar(
                   const SnackBar(content: Text('Kaleci profiliniz silindi.')),
                 );
               },

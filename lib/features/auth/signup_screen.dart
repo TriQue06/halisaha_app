@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../state/auth_controller.dart';
+import 'email_otp_screen.dart';
 import 'widgets/auth_widgets.dart';
 
 /// E-posta + şifre ile kayıt ekranı.
 ///
-/// Ad, soyad, doğum tarihi ve telefon burada toplanır ve `signUp`
-/// çağrısında metadata olarak gönderilir; `handle_new_user` trigger'ı
-/// bunları doğrudan `profiles` tablosuna yazar. Böylece e-posta ile
-/// kaydolan kullanıcı profil tamamlama ekranını hiç görmez.
+/// Ad, soyad ve doğum tarihi burada toplanıp `signUp` çağrısında metadata
+/// olarak gönderilir; `handle_new_user` trigger'ı bunları `profiles`
+/// tablosuna yazar. Böylece kullanıcı profil tamamlama ekranını görmez.
+///
+/// Telefon burada İSTENMEZ — yalnızca takım kurarken ve kaleci profilinde,
+/// gerçekten gerektiği anda sorulur.
+///
+/// Kayıt bu ekranda bitmez: `signUp` sonrası e-postaya 6 haneli kod gider
+/// ve kullanıcı [EmailOtpScreen] üzerinde kodu girerek kaydı tamamlar.
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
@@ -25,10 +31,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordConfirmController = TextEditingController();
 
   DateTime? _birthDate;
   bool _obscurePassword = true;
+  bool _obscurePasswordConfirm = true;
   bool _isBusy = false;
   bool _acceptedTerms = false;
   String? _error;
@@ -39,7 +46,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _phoneController.dispose();
+    _passwordConfirmController.dispose();
     super.dispose();
   }
 
@@ -75,33 +82,29 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     });
 
     try {
-      final response = await ref.read(authControllerProvider).signUpWithEmail(
-            email: _emailController.text,
-            password: _passwordController.text,
-            firstName: _firstNameController.text,
-            lastName: _lastNameController.text,
-            birthDate: _birthDate!,
-            phone: _phoneController.text,
-          );
+      final AuthResponse response =
+          await ref.read(authControllerProvider).signUpWithEmail(
+                email: _emailController.text,
+                password: _passwordController.text,
+                firstName: _firstNameController.text,
+                lastName: _lastNameController.text,
+                birthDate: _birthDate!,
+              );
 
       if (!mounted) return;
 
-      // E-posta doğrulaması açıksa oturum hemen açılmaz.
-      if (response.session == null) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${_emailController.text.trim()} adresine doğrulama bağlantısı '
-              'gönderildi. Onayladıktan sonra giriş yapabilirsin.',
-            ),
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      } else {
-        // Doğrulama kapalıysa oturum açıldı; AuthGate devralır.
+      if (response.session != null) {
+        // Supabase'de e-posta doğrulaması kapalıysa oturum hemen açılır.
         Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
+        return;
       }
+
+      // Normal akış: e-postaya kod gitti, kayıt kod girilince tamamlanacak.
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => EmailOtpScreen(email: _emailController.text.trim()),
+        ),
+      );
     } catch (error) {
       if (mounted) setState(() => _error = turkishAuthError(error));
     } finally {
@@ -186,30 +189,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ),
               const SizedBox(height: 12),
 
-              // --- Telefon ------------------------------------------
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                inputFormatters: <TextInputFormatter>[
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
-                  LengthLimitingTextInputFormatter(14),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'Telefon',
-                  hintText: '532 111 22 33',
-                  prefixText: '+90 ',
-                  prefixIcon: Icon(Icons.smartphone_rounded),
-                ),
-                validator: (String? value) {
-                  final String digits = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-                  final String core =
-                      digits.startsWith('0') ? digits.substring(1) : digits;
-                  if (core.length != 10) return '10 haneli numaranı gir.';
-                  if (!core.startsWith('5')) return 'Cep numarası 5 ile başlamalı.';
-                  return null;
-                },
-              ),
               const SizedBox(height: 20),
               const AuthDivider(label: 'giriş bilgileri'),
               const SizedBox(height: 20),
@@ -235,27 +214,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ),
               const SizedBox(height: 12),
 
-              // --- Şifre --------------------------------------------
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                autofillHints: const <String>[AutofillHints.newPassword],
-                decoration: InputDecoration(
-                  labelText: 'Şifre',
-                  helperText: 'En az 6 karakter',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: IconButton(
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
-                ),
-                validator: (String? v) =>
-                    (v?.length ?? 0) < 6 ? 'Şifre en az 6 karakter olmalı.' : null,
+              // --- Şifre + şifre onay -------------------------------
+              PasswordFields(
+                passwordController: _passwordController,
+                confirmController: _passwordConfirmController,
+                obscurePassword: _obscurePassword,
+                obscureConfirm: _obscurePasswordConfirm,
+                onTogglePassword: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                onToggleConfirm: () => setState(
+                    () => _obscurePasswordConfirm = !_obscurePasswordConfirm),
               ),
               const SizedBox(height: 12),
 

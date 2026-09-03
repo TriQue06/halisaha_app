@@ -8,12 +8,11 @@ import '../../core/constants/izmir_districts.dart';
 import '../../state/auth_controller.dart';
 import 'widgets/auth_widgets.dart';
 
-/// Google veya telefonla giren kullanıcıların eksik profilini tamamlar.
+/// Google ile giren kullanıcıların eksik profilini tamamlar.
 ///
-/// Google ad/soyad ve avatar verir ama **doğum tarihi ve telefon vermez**;
-/// telefon girişi ise yalnızca numarayı verir, ad/soyad hiç gelmez.
-/// Takım kurmak ve kaleci profili açmak bu alanları gerektirdiği için
-/// bu ekran atlanamaz.
+/// Google ad/soyad ve avatar verir ama **doğum tarihi vermez**. Ad, soyad
+/// ve doğum tarihi zorunlu; telefon isteğe bağlı (takım kurarken ve kaleci
+/// profilinde zaten ayrıca isteniyor).
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
 
@@ -245,15 +244,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                         LengthLimitingTextInputFormatter(14),
                       ],
                       decoration: const InputDecoration(
-                        labelText: 'Telefon',
+                        labelText: 'Telefon (isteğe bağlı)',
                         hintText: '532 111 22 33',
                         prefixText: '+90 ',
                         prefixIcon: Icon(Icons.smartphone_rounded),
-                        helperText: 'Rakip takımlar maç kesinleşince bu numarayı görür.',
+                        helperText: 'Takım kurarken ayrıca istenecek. Şimdi boş bırakabilirsin.',
                       ),
                       validator: (String? value) {
                         final String digits =
                             (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+                        if (digits.isEmpty) return null; // isteğe bağlı
                         final String core =
                             digits.startsWith('0') ? digits.substring(1) : digits;
                         if (core.length != 10) return '10 haneli numaranı gir.';

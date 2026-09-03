@@ -5,6 +5,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
+import 'core/services/ad_service.dart';
+import 'core/services/push_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_gate.dart';
 import 'state/settings_controller.dart';
@@ -19,6 +21,13 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     publishableKey: AppConfig.supabasePublishableKey,
   );
+
+  // Push bildirimleri. Kendi içinde hata yakalıyor: Firebase kurulmamış bir
+  // ortamda bile uygulama normal açılmaya devam eder.
+  await PushService.initialize();
+
+  // Reklamlar. Başarısız olursa uygulama reklamsız çalışmaya devam eder.
+  await AdService.initialize();
 
   runApp(const ProviderScope(child: JaponKaleApp()));
 }

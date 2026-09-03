@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/theme_selector.dart';
 
 /// Giriş/kayıt ekranlarının ortak yeşil gradyanlı üst başlığı.
 class AuthHeader extends StatelessWidget {
@@ -34,13 +35,15 @@ class AuthHeader extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(12),
+              // Uygulama logosu (launcher ikonuyla aynı görsel).
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/logo/japonkale.png',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
                 ),
-                child: const Icon(Icons.sports_soccer, color: Colors.white, size: 22),
               ),
               const SizedBox(width: 10),
               const Text(
@@ -52,6 +55,9 @@ class AuthHeader extends StatelessWidget {
                   letterSpacing: -0.4,
                 ),
               ),
+              const Spacer(),
+              // Tema seçimi girişten önce de yapılabilsin.
+              const ThemeSelector(compact: true),
             ],
           ),
           const SizedBox(height: 20),
@@ -217,6 +223,90 @@ class AuthErrorBox extends StatelessWidget {
   }
 }
 
+/// Şifre + şifre onay kutusu ikilisi.
+///
+/// Kayıt ve şifre sıfırlama ekranlarının ikisinde de aynı doğrulama
+/// kurallarının geçerli olması için tek yerde tutuluyor: en az 6 karakter
+/// ve iki alanın birebir eşleşmesi.
+class PasswordFields extends StatelessWidget {
+  const PasswordFields({
+    super.key,
+    required this.passwordController,
+    required this.confirmController,
+    required this.obscurePassword,
+    required this.obscureConfirm,
+    required this.onTogglePassword,
+    required this.onToggleConfirm,
+    this.passwordLabel = 'Şifre',
+    this.confirmLabel = 'Şifre (tekrar)',
+    this.onConfirmSubmitted,
+  });
+
+  final TextEditingController passwordController;
+  final TextEditingController confirmController;
+  final bool obscurePassword;
+  final bool obscureConfirm;
+  final VoidCallback onTogglePassword;
+  final VoidCallback onToggleConfirm;
+  final String passwordLabel;
+  final String confirmLabel;
+  final ValueChanged<String>? onConfirmSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TextFormField(
+          controller: passwordController,
+          obscureText: obscurePassword,
+          autofillHints: const <String>[AutofillHints.newPassword],
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: passwordLabel,
+            helperText: 'En az 6 karakter',
+            prefixIcon: const Icon(Icons.lock_outline_rounded),
+            suffixIcon: IconButton(
+              onPressed: onTogglePassword,
+              icon: Icon(
+                obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
+          ),
+          validator: (String? v) =>
+              (v?.length ?? 0) < 6 ? 'Şifre en az 6 karakter olmalı.' : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: confirmController,
+          obscureText: obscureConfirm,
+          autofillHints: const <String>[AutofillHints.newPassword],
+          onFieldSubmitted: onConfirmSubmitted,
+          decoration: InputDecoration(
+            labelText: confirmLabel,
+            prefixIcon: const Icon(Icons.lock_reset_rounded),
+            suffixIcon: IconButton(
+              onPressed: onToggleConfirm,
+              icon: Icon(
+                obscureConfirm
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
+          ),
+          validator: (String? v) {
+            if ((v ?? '').isEmpty) return 'Şifreni tekrar gir.';
+            if (v != passwordController.text) return 'Şifreler eşleşmiyor.';
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+}
+
 /// Supabase hatalarını kullanıcıya gösterilebilir Türkçe metne çevirir.
 String turkishAuthError(Object error) {
   final String raw = error.toString().toLowerCase();
@@ -241,6 +331,23 @@ String turkishAuthError(Object error) {
   }
   if (raw.contains('sms') || raw.contains('phone provider')) {
     return 'SMS gönderilemedi. Telefon girişi henüz yapılandırılmamış olabilir.';
+  }
+  // SMTP tarafı: Supabase e-postayı gönderemedi.
+  // En sık sebepleri: özel SMTP hiç kurulmamış (yerleşik servis yalnızca
+  // proje ekibine gönderir) ya da sağlayıcı alıcıyı reddetti (Resend'in
+  // onboarding@resend.dev adresi sadece hesap sahibine gönderebilir).
+  if (raw.contains('error sending confirmation email') ||
+      raw.contains('error sending recovery email') ||
+      raw.contains('error sending email') ||
+      raw.contains('unexpected_failure')) {
+    return 'Doğrulama e-postası gönderilemedi. Bu bir uygulama hatası değil, '
+        'e-posta servisi ayarından kaynaklanıyor. Supabase → Project Settings '
+        '→ Authentication → SMTP ayarlarını kontrol et.';
+  }
+  if (raw.contains('email address not authorized')) {
+    return 'Bu adrese e-posta gönderme yetkisi yok. Supabase varsayılan '
+        'e-posta servisi yalnızca proje ekibine gönderir; özel bir SMTP '
+        'sağlayıcı bağlaman gerekiyor.';
   }
   if (raw.contains('over_email_send_rate_limit') || raw.contains('rate limit')) {
     return 'Çok fazla deneme yaptın. Biraz bekleyip tekrar dene.';

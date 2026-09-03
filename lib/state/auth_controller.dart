@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
+import '../core/services/push_service.dart';
 
 /// Supabase istemcisi.
 final Provider<SupabaseClient> supabaseProvider =
@@ -46,10 +47,9 @@ final FutureProvider<Map<String, dynamic>?> myProfileProvider =
 bool isProfileComplete(Map<String, dynamic>? profile) {
   if (profile == null) return false;
   bool filled(String key) => (profile[key] as String?)?.trim().isNotEmpty ?? false;
-  return filled('first_name') &&
-      filled('last_name') &&
-      filled('phone') &&
-      profile['birth_date'] != null;
+  // Telefon burada aranmaz: takım kurarken ve kaleci profilinde ayrıca
+  // isteniyor. Veritabanındaki is_profile_complete() ile aynı kurallar.
+  return filled('first_name') && filled('last_name') && profile['birth_date'] != null;
 }
 
 /// Kimlik doğrulama işlemleri.
@@ -76,7 +76,6 @@ class AuthController {
     required String firstName,
     required String lastName,
     required DateTime birthDate,
-    required String phone,
   }) {
     return _auth.signUp(
       email: email.trim(),
@@ -85,7 +84,6 @@ class AuthController {
         'first_name': firstName.trim(),
         'last_name': lastName.trim(),
         'birth_date': _isoDate(birthDate),
-        'phone': normalizePhone(phone),
       },
     );
   }
@@ -97,32 +95,55 @@ class AuthController {
     return _auth.signInWithPassword(email: email.trim(), password: password);
   }
 
+  /// Şifre sıfırlama kodu gönderir.
+  ///
+  /// Bağlantı yerine kod kullanıyoruz: bağlantı tarayıcıda açılır ve
+  /// uygulamaya geri dönmek için derin bağlantı (deep link) kurulumu
+  /// gerekir. Kod ile akış tamamen uygulama içinde kapanıyor.
   Future<void> sendPasswordReset(String email) {
     return _auth.resetPasswordForEmail(email.trim());
   }
 
-  // -------------------------------------------------------------------
-  // TELEFON (SMS OTP)
-  // -------------------------------------------------------------------
-
-  /// Doğrulama kodu gönderir.
-  ///
-  /// Aynı çağrı hem kayıt hem giriş için çalışır: numara kayıtlıysa
-  /// giriş, değilse yeni kullanıcı oluşturulur.
-  Future<void> sendPhoneOtp(String phone) {
-    return _auth.signInWithOtp(phone: normalizePhone(phone));
-  }
-
-  /// SMS ile gelen kodu doğrular ve oturumu açar.
-  Future<AuthResponse> verifyPhoneOtp({
-    required String phone,
+  /// Sıfırlama kodunu doğrular; başarılıysa geçici bir oturum açılır.
+  Future<AuthResponse> verifyPasswordResetOtp({
+    required String email,
     required String token,
   }) {
     return _auth.verifyOTP(
-      type: OtpType.sms,
-      phone: normalizePhone(phone),
+      type: OtpType.recovery,
+      email: email.trim(),
       token: token.trim(),
     );
+  }
+
+  /// Kod doğrulandıktan sonra yeni şifreyi kaydeder.
+  Future<void> updatePassword(String newPassword) {
+    return _auth.updateUser(UserAttributes(password: newPassword));
+  }
+
+  // -------------------------------------------------------------------
+  // E-POSTA DOĞRULAMA KODU (6 hane)
+  // -------------------------------------------------------------------
+
+  /// Kayıt sırasında gönderilen kodu doğrular ve oturumu açar.
+  ///
+  /// `signUp` çağrısından sonra Supabase "Confirm signup" şablonundaki
+  /// {{ .Token }} kodunu e-postayla gönderir. Bu kod doğrulanınca hesap
+  /// onaylanır ve kullanıcı doğrudan giriş yapmış olur.
+  Future<AuthResponse> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) {
+    return _auth.verifyOTP(
+      type: OtpType.signup,
+      email: email.trim(),
+      token: token.trim(),
+    );
+  }
+
+  /// Yeni kod gönderir. Yeni kod üretildiği anda önceki kod geçersiz olur.
+  Future<void> resendEmailOtp(String email) {
+    return _auth.resend(type: OtpType.signup, email: email.trim());
   }
 
   // -------------------------------------------------------------------
@@ -175,14 +196,19 @@ class AuthController {
   // ORTAK
   // -------------------------------------------------------------------
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    // Önce token'ı sil: çıkıştan sonra RLS bu satıra erişimi engeller ve
+    // cihaz eski hesabın bildirimlerini almaya devam ederdi.
+    await PushService.unregister();
+    await _auth.signOut();
+  }
 
   /// Google veya telefonla girenlerin eksik profilini tamamlar.
   Future<void> completeProfile({
     required String firstName,
     required String lastName,
     required DateTime birthDate,
-    required String phone,
+    String? phone,
     String? district,
   }) async {
     final User? user = _auth.currentUser;
@@ -194,7 +220,7 @@ class AuthController {
       'first_name': firstName.trim(),
       'last_name': lastName.trim(),
       'birth_date': _isoDate(birthDate),
-      'phone': normalizePhone(phone),
+      if (phone != null && phone.trim().isNotEmpty) 'phone': normalizePhone(phone),
       if (district != null) 'district': district,
     }).eq('id', user.id);
   }

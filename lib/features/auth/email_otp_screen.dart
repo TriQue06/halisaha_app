@@ -8,34 +8,40 @@ import '../../core/config/app_config.dart';
 import '../../state/auth_controller.dart';
 import 'widgets/auth_widgets.dart';
 
-/// SMS ile gelen doğrulama kodunun girildiği ekran.
+/// Kayıt sırasında e-postaya gönderilen doğrulama kodunun girildiği ekran.
 ///
-/// Kod doğrulanınca Supabase oturumu açar; [AuthGate] bunu görüp
-/// kullanıcıyı profil tamamlama veya ana ekrana yönlendirir.
-class PhoneOtpScreen extends ConsumerStatefulWidget {
-  const PhoneOtpScreen({super.key, required this.phone});
+/// Kod doğrulanınca hesap onaylanır ve oturum açılır; [AuthGate] devralıp
+/// kullanıcıyı ana ekrana geçirir. Kayıt bu adım tamamlanmadan bitmez.
+class EmailOtpScreen extends ConsumerStatefulWidget {
+  const EmailOtpScreen({super.key, required this.email});
 
-  /// E.164 biçiminde numara (+905321112233).
-  final String phone;
+  final String email;
 
   @override
-  ConsumerState<PhoneOtpScreen> createState() => _PhoneOtpScreenState();
+  ConsumerState<EmailOtpScreen> createState() => _EmailOtpScreenState();
 }
 
-class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
+class _EmailOtpScreenState extends ConsumerState<EmailOtpScreen> {
   final TextEditingController _codeController = TextEditingController();
 
   bool _isBusy = false;
   String? _error;
 
-  /// Yeniden kod gönderme için bekleme süresi (saniye).
-  int _resendCooldown = 60;
+  /// Yeni kod isteyebilmek için beklenecek süre (saniye).
+  int _resendCooldown = _resendSeconds;
+
+  /// Kodun geçerliliğinin bitmesine kalan süre (saniye).
+  int _validitySeconds = _validitySecondsTotal;
+
   Timer? _timer;
+
+  static const int _resendSeconds = 30;
+  static const int _validitySecondsTotal = 5 * 60;
 
   @override
   void initState() {
     super.initState();
-    _startCooldown();
+    _startTimers();
   }
 
   @override
@@ -45,14 +51,27 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
     super.dispose();
   }
 
-  void _startCooldown() {
+  void _startTimers() {
     _timer?.cancel();
-    setState(() => _resendCooldown = 60);
+    setState(() {
+      _resendCooldown = _resendSeconds;
+      _validitySeconds = _validitySecondsTotal;
+    });
+
     _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
       if (!mounted) return timer.cancel();
-      setState(() => _resendCooldown--);
-      if (_resendCooldown <= 0) timer.cancel();
+      setState(() {
+        if (_resendCooldown > 0) _resendCooldown--;
+        if (_validitySeconds > 0) _validitySeconds--;
+      });
+      if (_resendCooldown == 0 && _validitySeconds == 0) timer.cancel();
     });
+  }
+
+  String get _validityLabel {
+    final int m = _validitySeconds ~/ 60;
+    final int s = _validitySeconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 
   Future<void> _verify() async {
@@ -68,14 +87,19 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
     });
 
     try {
-      await ref.read(authControllerProvider).verifyPhoneOtp(
-            phone: widget.phone,
+      await ref.read(authControllerProvider).verifyEmailOtp(
+            email: widget.email,
             token: code,
           );
       // Oturum açıldı; giriş ekranına kadar olan yığını temizle.
       if (mounted) Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
     } catch (error) {
-      if (mounted) setState(() => _error = turkishAuthError(error));
+      if (mounted) {
+        setState(() {
+          _error = turkishAuthError(error);
+          _codeController.clear();
+        });
+      }
     } finally {
       if (mounted) setState(() => _isBusy = false);
     }
@@ -84,11 +108,14 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   Future<void> _resend() async {
     setState(() => _error = null);
     try {
-      await ref.read(authControllerProvider).sendPhoneOtp(widget.phone);
-      _startCooldown();
+      await ref.read(authControllerProvider).resendEmailOtp(widget.email);
+      _codeController.clear();
+      _startTimers();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Yeni kod gönderildi.')),
+        const SnackBar(
+          content: Text('Yeni kod gönderildi. Önceki kod geçersiz oldu.'),
+        ),
       );
     } catch (error) {
       if (mounted) setState(() => _error = turkishAuthError(error));
@@ -98,9 +125,10 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool isExpired = _validitySeconds == 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Doğrulama')),
+      appBar: AppBar(title: const Text('E-postanı doğrula')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
@@ -108,7 +136,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Icon(
-                Icons.sms_outlined,
+                Icons.mark_email_unread_outlined,
                 size: 46,
                 color: theme.colorScheme.primary,
               ),
@@ -122,13 +150,13 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               const SizedBox(height: 8),
               Text.rich(
                 TextSpan(
-                  text: 'Doğrulama kodunu ',
+                  text: '${AppConfig.otpLength} haneli doğrulama kodunu ',
                   children: <InlineSpan>[
                     TextSpan(
-                      text: widget.phone,
+                      text: widget.email,
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
-                    const TextSpan(text: ' numarasına gönderdik.'),
+                    const TextSpan(text: ' adresine gönderdik.'),
                   ],
                 ),
                 textAlign: TextAlign.center,
@@ -142,26 +170,54 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 autofocus: true,
+                enabled: !isExpired,
                 maxLength: AppConfig.otpLength,
                 autofillHints: const <String>[AutofillHints.oneTimeCode],
                 inputFormatters: <TextInputFormatter>[
                   FilteringTextInputFormatter.digitsOnly,
                 ],
                 style: const TextStyle(
-                  fontSize: 30,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 12,
+                  letterSpacing: 10,
                 ),
                 decoration: const InputDecoration(
                   counterText: '',
                   hintText: '••••••',
-                  hintStyle: TextStyle(letterSpacing: 12, fontSize: 26),
+                  hintStyle: TextStyle(letterSpacing: 10, fontSize: 24),
                 ),
                 onChanged: (String value) {
                   if (_error != null) setState(() => _error = null);
                   // Kod tamamlanınca otomatik doğrula.
                   if (value.length == AppConfig.otpLength) _verify();
                 },
+              ),
+              const SizedBox(height: 10),
+
+              // --- Geçerlilik sayacı ---------------------------------
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Icon(
+                    isExpired ? Icons.timer_off_rounded : Icons.timer_outlined,
+                    size: 15,
+                    color: isExpired
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isExpired
+                        ? 'Kodun süresi doldu, yeni kod al'
+                        : 'Kod $_validityLabel süre sonra geçersiz olacak',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: isExpired
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
@@ -171,7 +227,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               ],
 
               FilledButton(
-                onPressed: _isBusy ? null : _verify,
+                onPressed: (_isBusy || isExpired) ? null : _verify,
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
                 child: _isBusy
                     ? const SizedBox(
@@ -182,7 +238,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Doğrula ve Giriş Yap'),
+                    : const Text('Doğrula ve Kaydı Tamamla'),
               ),
               const SizedBox(height: 12),
 
@@ -193,6 +249,14 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                       ? 'Yeni kod gönder ($_resendCooldown sn)'
                       : 'Yeni kod gönder',
                 ),
+              ),
+
+              const SizedBox(height: 4),
+              Text(
+                'Kod gelmediyse spam klasörünü kontrol et.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),

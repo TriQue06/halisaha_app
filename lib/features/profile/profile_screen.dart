@@ -8,6 +8,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
 import 'goalkeeper_profile_editor.dart';
+import 'widgets/phone_editor.dart';
 import 'widgets/pending_match_card.dart';
 
 /// Profilim sekmesi: kullanıcı bilgileri + "Takımım" / "Kaleci Profilim" tabları.
@@ -113,9 +114,28 @@ class _ProfileHeader extends StatelessWidget {
                           ' · ${user!.age} yaşında',
                 ),
                 const SizedBox(height: 2),
-                _HeaderInfoRow(
-                  icon: Icons.phone_outlined,
-                  text: user?.phone.isNotEmpty ?? false ? user!.phone : '—',
+                // Telefon tek kaynaktan yönetiliyor; düzenleme burada.
+                InkWell(
+                  onTap: () => showPhoneEditor(context),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Flexible(
+                        child: _HeaderInfoRow(
+                          icon: Icons.phone_outlined,
+                          text: user?.phone.isNotEmpty ?? false
+                              ? user!.phone
+                              : 'Telefon numarası ekle',
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 13,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -163,9 +183,11 @@ class _MyTeamTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Team> myTeams = ref.watch(myTeamsProvider);
-    final List<PendingMatch> pending = ref.watch(pendingMatchesProvider);
-    final List<MatchHistoryEntry> history = ref.watch(matchHistoryProvider);
+    final List<Team> myTeams = ref.watch(myTeamsProvider).valueOrNull ?? const <Team>[];
+    final List<PendingMatch> pending =
+        ref.watch(pendingMatchesProvider).valueOrNull ?? const <PendingMatch>[];
+    final List<MatchHistoryEntry> history =
+        ref.watch(matchHistoryProvider).valueOrNull ?? const <MatchHistoryEntry>[];
 
     if (myTeams.isEmpty) {
       return const EmptyState(
@@ -175,7 +197,17 @@ class _MyTeamTab extends ConsumerWidget {
       );
     }
 
-    return ListView(
+    Future<void> refresh() async {
+      ref.invalidate(myTeamsProvider);
+      ref.invalidate(pendingMatchesProvider);
+      ref.invalidate(matchHistoryProvider);
+      await ref.read(pendingMatchesProvider.future);
+    }
+
+    return RefreshIndicator(
+      onRefresh: refresh,
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 28),
       children: <Widget>[
         // --- Takım özeti ---------------------------------------------
@@ -197,7 +229,7 @@ class _MyTeamTab extends ConsumerWidget {
           const EmptyState(
             icon: Icons.inbox_outlined,
             title: 'Bekleyen maç yok',
-            message: 'Saha detayından rakip takımlara meydan okuyabilirsin.',
+            message: 'Saha detayından rakip takımlara maç teklifi gönderebilirsin.',
             compact: true,
           )
         else
@@ -226,6 +258,7 @@ class _MyTeamTab extends ConsumerWidget {
               child: _MatchHistoryTile(entry: entry),
             ),
       ],
+      ),
     );
   }
 }

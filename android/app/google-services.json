@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "166383252757",
+    "project_id": "japon-kale",
+    "storage_bucket": "japon-kale.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:166383252757:android:bfa648fe39d8b773dbe51c",
+        "android_client_info": {
+          "package_name": "com.japonkale.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxTFgtvji8JfJvO3tPC1xrFHVeTqOQk9k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

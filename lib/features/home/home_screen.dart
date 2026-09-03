@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/banner_ad_slot.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import '../notifications/notifications_screen.dart';
 import '../pitches/pitch_detail_screen.dart';
 import '../profile/goalkeeper_profile_editor.dart';
 import 'widgets/month_calendar.dart';
@@ -23,8 +25,8 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final UserProfile? user = ref.watch(currentUserProvider);
-    final List<Pitch> popular = ref.watch(popularPitchesProvider);
-    final Goalkeeper? myGoalkeeper = ref.watch(myGoalkeeperProvider);
+    final AsyncValue<List<Pitch>> popular = ref.watch(popularPitchesProvider);
+    final Goalkeeper? myGoalkeeper = ref.watch(myGoalkeeperProvider).valueOrNull;
     final List<CalendarEvent> events = ref.watch(calendarEventsProvider);
     final DateTime selectedDay = ref.watch(selectedDayProvider);
     final DateTime focusedMonth = ref.watch(focusedMonthProvider);
@@ -49,21 +51,40 @@ class HomeScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 214,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: popular.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (BuildContext context, int index) {
-                    final Pitch pitch = popular[index];
-                    return PopularPitchCard(
-                      pitch: pitch,
-                      rank: index + 1,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => PitchDetailScreen(pitchId: pitch.id),
-                        ),
+                child: popular.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (Object error, StackTrace stack) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Sahalar yüklenemedi.',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
+                    ),
+                  ),
+                  data: (List<Pitch> list) {
+                    if (list.isEmpty) {
+                      return const Center(
+                        child: Text('Henüz kayıtlı halı saha yok.'),
+                      );
+                    }
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (BuildContext context, int index) {
+                        final Pitch pitch = list[index];
+                        return PopularPitchCard(
+                          pitch: pitch,
+                          rank: index + 1,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => PitchDetailScreen(pitchId: pitch.id),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -104,6 +125,10 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            // Reklam: takvimin altında, hiçbir aksiyon butonuna bitişik değil.
+            const SliverToBoxAdapter(child: BannerAdSlot(
+              padding: EdgeInsets.fromLTRB(12, 16, 12, 0),
+            )),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
@@ -113,14 +138,15 @@ class HomeScreen extends ConsumerWidget {
 }
 
 /// Yeşil gradyanlı karşılama başlığı.
-class _HomeHeader extends StatelessWidget {
+class _HomeHeader extends ConsumerWidget {
   const _HomeHeader({required this.user});
 
   final UserProfile? user;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final int unread = ref.watch(unreadNotificationCountProvider);
 
     return Container(
       width: double.infinity,
@@ -170,13 +196,57 @@ class _HomeHeader extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
+          // Zil: okunmamış bildirim sayısını rozette gösterir.
+          Material(
+            color: Colors.white.withValues(alpha: 0.15),
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationsScreen(),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(11),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
+                    Icon(
+                      unread > 0
+                          ? Icons.notifications_active_rounded
+                          : Icons.notifications_none_rounded,
+                      color: Colors.white,
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          constraints: const BoxConstraints(minWidth: 17),
+                          decoration: BoxDecoration(
+                            color: AppColors.loss,
+                            shape: BoxShape.rectangle,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: Colors.white, width: 1.2),
+                          ),
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-            child: const Icon(Icons.notifications_none_rounded, color: Colors.white),
           ),
         ],
       ),

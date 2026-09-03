@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/match_errors.dart';
+import '../../core/utils/phone_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import '../profile/widgets/phone_editor.dart';
 
 /// Saha Detay Sayfası.
 ///
 /// - Saha özellikleri ve fotoğraf placeholder'ı
 /// - "Takımımı Bu Sahaya Kaydet/Oluştur" butonu (sadece takımı yoksa)
 /// - Sahaya kayıtlı takımlar + G/B/M istatistikleri
-/// - **MEYDAN OKU** butonu yalnızca kullanıcının BU sahada takımı varsa görünür.
+/// - **MAÇ TEKLİFİ** butonu yalnızca kullanıcının BU sahada takımı varsa görünür.
 class PitchDetailScreen extends ConsumerWidget {
   const PitchDetailScreen({super.key, required this.pitchId});
 
@@ -19,12 +22,36 @@ class PitchDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Pitch pitch =
-        ref.watch(pitchesProvider).firstWhere((Pitch p) => p.id == pitchId);
-    final List<Team> teams = ref.watch(teamsForPitchProvider(pitchId));
+    final AsyncValue<Pitch?> pitchAsync = ref.watch(pitchByIdProvider(pitchId));
+    final AsyncValue<List<Team>> teamsAsync = ref.watch(teamsForPitchProvider(pitchId));
 
-    /// Meydan okuma yetkisinin tek koşulu: bu sahada kayıtlı bir takımım var mı?
+    /// Teklif gönderme yetkisinin tek koşulu: bu sahada kayıtlı takımım var mı?
     final Team? myTeam = ref.watch(myTeamForPitchProvider(pitchId));
+
+    /// Halihazırda aktif maçımız olan takımlar — onlara ikinci teklif
+    /// gönderilemez (DB'de aynı çift için tek aktif maç kuralı var).
+    final Set<String> busyOpponentIds = <String>{
+      for (final PendingMatch m
+          in ref.watch(pendingMatchesProvider).valueOrNull ?? const <PendingMatch>[])
+        if (m.opponentTeamId.isNotEmpty) m.opponentTeamId,
+    };
+
+    final Pitch? pitch = pitchAsync.valueOrNull;
+    if (pitch == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Saha')),
+        body: Center(
+          child: pitchAsync.hasError
+              ? EmptyState(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Saha bilgisi yüklenemedi',
+                  message: pitchAsync.error.toString(),
+                )
+              : const CircularProgressIndicator(),
+        ),
+      );
+    }
+    final List<Team> teams = teamsAsync.valueOrNull ?? const <Team>[];
 
     return Scaffold(
       body: CustomScrollView(
@@ -82,8 +109,8 @@ class PitchDetailScreen extends ConsumerWidget {
             child: SectionHeader(
               title: 'Kayıtlı Takımlar',
               subtitle: myTeam == null
-                  ? 'Meydan okumak için önce bu sahaya takımını kaydet'
-                  : '${teams.length} takım · Rakip seç ve meydan oku',
+                  ? 'Maç teklifi göndermek için önce bu sahaya takımını kaydet'
+                  : '${teams.length} takım · Rakip seç ve teklif gönder',
               icon: Icons.shield_moon_rounded,
             ),
           ),
@@ -107,8 +134,9 @@ class PitchDetailScreen extends ConsumerWidget {
                   child: _TeamRow(
                     team: team,
                     rank: index + 1,
-                    // Kendi takımıma meydan okuyamam.
+                    // Kendi takımıma teklif gönderemem.
                     canChallenge: myTeam != null && myTeam.id != team.id,
+                    hasActiveMatch: busyOpponentIds.contains(team.id),
                     isMyTeam: myTeam?.id == team.id,
                     onChallenge: () => _sendChallenge(context, ref, myTeam!, team, pitch),
                   ),
@@ -134,9 +162,9 @@ class PitchDetailScreen extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Meydan Oku'),
+        title: const Text('Maç Teklifi Gönder'),
         content: Text(
-          '${opponent.name} takımına meydan okuma göndermek üzeresiniz.\n\n'
+          '${opponent.name} takımına maç teklifi göndermek üzeresiniz.\n\n'
           'Rakip kabul ederse maç "Bekleyen Maçlar" listenize düşecek ve '
           'iki tarafın da 1 hafta içinde "Maça Hazırım" onayı vermesi gerekecek.',
         ),
@@ -146,16 +174,24 @@ class PitchDetailScreen extends ConsumerWidget {
             child: const Text('Vazgeç'),
           ),
           FilledButton(
-            onPressed: () {
-              ref.read(pendingMatchesProvider.notifier).sendChallenge(
-                    myTeam: myTeam,
-                    opponent: opponent,
-                    pitchName: pitch.name,
-                  );
+            onPressed: () async {
+              final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
               Navigator.of(dialogContext).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${opponent.name} takımına meydan okuma gönderildi.')),
-              );
+              try {
+                await ref.read(matchActionsProvider).sendChallenge(
+                      myTeamId: myTeam.id,
+                      opponentTeamId: opponent.id,
+                    );
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('${opponent.name} takımına maç teklifi gönderildi.'),
+                  ),
+                );
+              } catch (error) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text(turkishMatchError(error))),
+                );
+              }
             },
             child: const Text('Gönder'),
           ),
@@ -227,9 +263,7 @@ class _PitchInfoSection extends StatelessWidget {
           ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${pitch.name}: ${pitch.phone}')),
-            ),
+            onPressed: () => PhoneLauncher.call(context, pitch.phone),
             icon: const Icon(Icons.phone_outlined, size: 18),
             label: Text('Sahayı Ara · ${pitch.phone}'),
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
@@ -241,13 +275,14 @@ class _PitchInfoSection extends StatelessWidget {
 }
 
 // =====================================================================
-// Takım satırı (G/B/M + MEYDAN OKU)
+// Takım satırı (G/B/M + MAÇ TEKLİFİ)
 // =====================================================================
 class _TeamRow extends StatelessWidget {
   const _TeamRow({
     required this.team,
     required this.rank,
     required this.canChallenge,
+    required this.hasActiveMatch,
     required this.isMyTeam,
     required this.onChallenge,
   });
@@ -257,6 +292,9 @@ class _TeamRow extends StatelessWidget {
 
   /// Butonun görünürlüğünü belirler: kullanıcının bu sahada takımı yoksa `false`.
   final bool canChallenge;
+
+  /// Bu takımla zaten devam eden bir maç var mı? Varsa buton pasif.
+  final bool hasActiveMatch;
   final bool isMyTeam;
   final VoidCallback onChallenge;
 
@@ -328,13 +366,13 @@ class _TeamRow extends StatelessWidget {
               ],
             ),
             // ---------------------------------------------------------
-            // MEYDAN OKU — yalnızca kullanıcının bu sahada takımı varsa.
+            // MAÇ TEKLİFİ — yalnızca kullanıcının bu sahada takımı varsa.
             // Takımı yoksa buton hiç render edilmez (gizli).
             // ---------------------------------------------------------
             if (canChallenge) ...<Widget>[
               const SizedBox(width: 8),
               FilledButton(
-                onPressed: onChallenge,
+                onPressed: hasActiveMatch ? null : onChallenge,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 38),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -343,7 +381,7 @@ class _TeamRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                   ),
                 ),
-                child: const Text('MEYDAN OKU'),
+                child: Text(hasActiveMatch ? 'MAÇ VAR' : 'MAÇ TEKLİFİ'),
               ),
             ],
           ],
@@ -385,7 +423,7 @@ class _MyTeamBanner extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 Text(
-                  'Diğer takımlara meydan okuyabilirsin.',
+                  'Diğer takımlara maç teklifi gönderebilirsin.',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
@@ -413,34 +451,40 @@ class _CreateTeamSheet extends ConsumerStatefulWidget {
 class _CreateTeamSheetState extends ConsumerState<_CreateTeamSheet> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
-  late final TextEditingController _phoneController =
-      TextEditingController(text: ref.read(currentUserProvider)?.phone ?? '');
 
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    ref.read(teamsProvider.notifier).createTeam(
-          pitchId: widget.pitch.id,
-          name: _nameController.text.trim(),
-          contactPhone: _phoneController.text.trim(),
-        );
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
 
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${widget.pitch.name} sahasına takımın kaydedildi.')),
-    );
+    try {
+      await ref.read(createTeamProvider)(
+        pitchId: widget.pitch.id,
+        name: _nameController.text.trim(),
+      );
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('${widget.pitch.name} sahasına takımın kaydedildi.')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Takım oluşturulamadı: $error')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    // Numara olmadan takım kurulamaz (veritabanı da reddediyor).
+    final bool hasPhone = (ref.watch(currentUserProvider)?.phone ?? '').isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -482,23 +526,11 @@ class _CreateTeamSheetState extends ConsumerState<_CreateTeamSheet> {
               },
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Takım İletişim Numarası',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (String? value) {
-                if (value == null || value.trim().length < 10) {
-                  return 'Geçerli bir telefon numarası girin.';
-                }
-                return null;
-              },
-            ),
+            // Numara elle girilmiyor: profildeki numara kullanılır.
+            const ContactPhoneNotice(label: 'Takım iletişim numarası'),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: _submit,
+              onPressed: hasPhone ? _submit : null,
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
               child: const Text('Takımı Kaydet'),
             ),

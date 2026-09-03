@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bildirim ikonunun tonu: uygulamanin koyu yesili -->
+    <color name="notification_color">#0B5D2E</color>
+	<color name="ic_launcher_background">#0B6B3A</color>
+</resources>

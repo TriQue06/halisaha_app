@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Yayin imzalama - ASLA depoya girmemeli
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
+*.jks
+*.keystore
+
+# Firebase service account / gizli anahtarlar
+**/serviceAccountKey.json

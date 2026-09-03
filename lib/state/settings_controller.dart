@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 @immutable
 class AppSettings {
   const AppSettings({
-    this.themeMode = ThemeMode.light,
+    this.themeMode = ThemeMode.system,
     this.textScale = 1.0,
     this.matchNotifications = true,
     this.challengeNotifications = true,
@@ -21,6 +21,8 @@ class AppSettings {
   final bool challengeNotifications;
   final bool goalkeeperNotifications;
 
+  /// Yalnızca "koyu seçili mi" bilgisi; sistem modunda anlamı yoktur,
+  /// gerçek görünüm için `Theme.of(context).brightness` kullanılmalı.
   bool get isDark => themeMode == ThemeMode.dark;
 
   AppSettings copyWith({
@@ -42,7 +44,10 @@ class AppSettings {
 
 /// Tercihleri tutar ve cihazda kalıcı hale getirir.
 class SettingsController extends Notifier<AppSettings> {
+  /// Eski sürümde tema yalnızca açık/koyu bool'uydu. Yeni anahtar üç
+  /// değerli (system/light/dark); eskisi ilk açılışta göç ettiriliyor.
   static const String _kThemeDark = 'settings.theme_dark';
+  static const String _kThemeMode = 'settings.theme_mode';
   static const String _kTextScale = 'settings.text_scale';
   static const String _kMatchNotif = 'settings.notif_match';
   static const String _kChallengeNotif = 'settings.notif_challenge';
@@ -52,17 +57,37 @@ class SettingsController extends Notifier<AppSettings> {
 
   @override
   AppSettings build() {
-    // Varsayılan tema: açık (koyu yeşil + beyaz). Kayıtlı tercih varsa
+    // Varsayılan tema: cihazın kendi ayarı. Kayıtlı tercih varsa
     // asenkron olarak yüklenip state güncellenir.
     _restore();
     return const AppSettings();
   }
 
+  static ThemeMode _modeFromName(String? name) => switch (name) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+
+  static String _modeToName(ThemeMode mode) => switch (mode) {
+        ThemeMode.light => 'light',
+        ThemeMode.dark => 'dark',
+        ThemeMode.system => 'system',
+      };
+
   Future<void> _restore() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     _prefs = prefs;
+    // Yeni anahtar yoksa eski bool'dan göç et; o da yoksa sistem.
+    final String? storedMode = prefs.getString(_kThemeMode);
+    final ThemeMode mode = storedMode != null
+        ? _modeFromName(storedMode)
+        : prefs.containsKey(_kThemeDark)
+            ? (prefs.getBool(_kThemeDark)! ? ThemeMode.dark : ThemeMode.light)
+            : ThemeMode.system;
+
     state = AppSettings(
-      themeMode: (prefs.getBool(_kThemeDark) ?? false) ? ThemeMode.dark : ThemeMode.light,
+      themeMode: mode,
       textScale: prefs.getDouble(_kTextScale) ?? 1.0,
       matchNotifications: prefs.getBool(_kMatchNotif) ?? true,
       challengeNotifications: prefs.getBool(_kChallengeNotif) ?? true,
@@ -70,10 +95,15 @@ class SettingsController extends Notifier<AppSettings> {
     );
   }
 
-  void toggleTheme(bool isDark) {
-    state = state.copyWith(themeMode: isDark ? ThemeMode.dark : ThemeMode.light);
-    _prefs?.setBool(_kThemeDark, isDark);
+  /// Tema modunu ayarlar (sistem / açık / koyu).
+  void setThemeMode(ThemeMode mode) {
+    state = state.copyWith(themeMode: mode);
+    _prefs?.setString(_kThemeMode, _modeToName(mode));
   }
+
+  /// Açık ↔ koyu arasında gider gelir; sistem modundayken o anki
+  /// görünümün tersine geçer.
+  void toggleTheme(bool isDark) => setThemeMode(isDark ? ThemeMode.dark : ThemeMode.light);
 
   void setTextScale(double scale) {
     final double clamped = scale.clamp(0.8, 1.4);

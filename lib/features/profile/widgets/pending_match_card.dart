@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/match_errors.dart';
+import '../../../core/utils/phone_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common_widgets.dart';
 import '../../../models/models.dart';
@@ -74,7 +76,7 @@ class _CardHeader extends StatelessWidget {
           children: <Widget>[
             Expanded(child: _StageBadge(stage: match.stage)),
             if (match.isChallenger)
-              const InfoPill(label: 'Meydan okuyan sizsiniz', icon: Icons.bolt_rounded),
+              const InfoPill(label: 'Teklifi siz gönderdiniz', icon: Icons.bolt_rounded),
           ],
         ),
         const SizedBox(height: 10),
@@ -142,7 +144,7 @@ class _StageBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (String label, Color color, IconData icon) = switch (stage) {
       PendingMatchStage.invitationReceived => (
-          'MEYDAN OKUNDU',
+          'MAÇ TEKLİFİ',
           AppColors.info,
           Icons.mark_email_unread_rounded,
         ),
@@ -222,9 +224,7 @@ class _ContactPanel extends StatelessWidget {
             ),
           ),
           FilledButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${match.opponentPhone} aranıyor...')),
-            ),
+            onPressed: () => PhoneLauncher.call(context, match.opponentPhone),
             icon: const Icon(Icons.phone_rounded, size: 16),
             label: const Text('Ara'),
             style: FilledButton.styleFrom(
@@ -250,18 +250,18 @@ class _StageActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final PendingMatchesController controller = ref.read(pendingMatchesProvider.notifier);
+    final MatchActions actions = ref.read(matchActionsProvider);
 
     switch (match.stage) {
       // -----------------------------------------------------------------
-      // AŞAMA 1a — Bize meydan okundu: Kabul / Reddet
+      // AŞAMA 1a — Bize teklif geldi: Kabul / Reddet
       // -----------------------------------------------------------------
       case PendingMatchStage.invitationReceived:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _HintText(
-              '${match.opponentTeamName} size meydan okudu. Kabul ederseniz '
+              '${match.opponentTeamName} size maç teklifi gönderdi. Kabul ederseniz '
               'iki tarafın da 1 hafta içinde "Maça Hazırım" onayı vermesi gerekir.',
             ),
             const SizedBox(height: 12),
@@ -269,7 +269,7 @@ class _StageActions extends ConsumerWidget {
               children: <Widget>[
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _confirmReject(context, controller),
+                    onPressed: () => _confirmReject(context, actions),
                     icon: const Icon(Icons.close_rounded, size: 18),
                     label: const Text('Reddet'),
                     style: OutlinedButton.styleFrom(foregroundColor: AppColors.loss),
@@ -279,10 +279,12 @@ class _StageActions extends ConsumerWidget {
                 Expanded(
                   flex: 2,
                   child: FilledButton.icon(
-                    onPressed: () {
-                      controller.acceptChallenge(match.id);
-                      _snack(context, 'Meydan okuma kabul edildi. Şimdi "Maça Hazırım" onayı verin.');
-                    },
+                    onPressed: () => _run(
+                      context,
+                      () => actions.accept(match.id),
+                      successMessage:
+                          'Teklif kabul edildi. Şimdi "Maça Hazırım" onayı verin.',
+                    ),
                     icon: const Icon(Icons.check_rounded, size: 18),
                     label: const Text('Kabul Et'),
                   ),
@@ -293,7 +295,7 @@ class _StageActions extends ConsumerWidget {
         );
 
       // -----------------------------------------------------------------
-      // AŞAMA 1b — Biz meydan okuduk: rakibin yanıtını bekliyoruz
+      // AŞAMA 1b — Teklifi biz gönderdik: rakibin yanıtını bekliyoruz
       // -----------------------------------------------------------------
       case PendingMatchStage.invitationSent:
         return Row(
@@ -304,7 +306,7 @@ class _StageActions extends ConsumerWidget {
               ),
             ),
             TextButton(
-              onPressed: () => _confirmReject(context, controller, isWithdraw: true),
+              onPressed: () => _confirmReject(context, actions, isWithdraw: true),
               child: const Text('Geri Çek'),
             ),
           ],
@@ -347,10 +349,11 @@ class _StageActions extends ConsumerWidget {
               )
             else
               FilledButton.icon(
-                onPressed: () {
-                  controller.markReady(match.id);
-                  _snack(context, 'Onayınız kaydedildi.');
-                },
+                onPressed: () => _run(
+                  context,
+                  () => actions.markReady(match.id),
+                  successMessage: 'Onayınız kaydedildi.',
+                ),
                 icon: const Icon(Icons.sports_soccer_rounded, size: 18),
                 label: const Text('MAÇA HAZIRIM'),
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
@@ -363,10 +366,10 @@ class _StageActions extends ConsumerWidget {
       // -----------------------------------------------------------------
       case PendingMatchStage.confirmed:
         if (match.matchDate == null) {
-          // Gün ve saati yalnızca meydan okuyan takım girer.
+          // Gün ve saati yalnızca teklifi gönderen takım girer.
           return match.isChallenger
               ? FilledButton.icon(
-                  onPressed: () => _pickMatchDate(context, controller),
+                  onPressed: () => _pickMatchDate(context, actions),
                   icon: const Icon(Icons.event_available_rounded, size: 18),
                   label: const Text('Maç Gün ve Saatini Belirle'),
                   style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
@@ -385,7 +388,7 @@ class _StageActions extends ConsumerWidget {
             ),
             if (match.isChallenger)
               TextButton(
-                onPressed: () => _pickMatchDate(context, controller),
+                onPressed: () => _pickMatchDate(context, actions),
                 child: const Text('Değiştir'),
               ),
           ],
@@ -413,7 +416,7 @@ class _StageActions extends ConsumerWidget {
                     label: 'Kazandık',
                     color: AppColors.win,
                     icon: Icons.emoji_events_rounded,
-                    onPressed: () => _reportResult(context, controller, TeamOutcome.win),
+                    onPressed: () => _reportResult(context, actions, TeamOutcome.win),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -422,7 +425,7 @@ class _StageActions extends ConsumerWidget {
                     label: 'Berabere',
                     color: AppColors.draw,
                     icon: Icons.handshake_rounded,
-                    onPressed: () => _reportResult(context, controller, TeamOutcome.draw),
+                    onPressed: () => _reportResult(context, actions, TeamOutcome.draw),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -431,7 +434,7 @@ class _StageActions extends ConsumerWidget {
                     label: 'Kaybettik',
                     color: AppColors.loss,
                     icon: Icons.trending_down_rounded,
-                    onPressed: () => _reportResult(context, controller, TeamOutcome.loss),
+                    onPressed: () => _reportResult(context, actions, TeamOutcome.loss),
                   ),
                 ),
               ],
@@ -468,23 +471,40 @@ class _StageActions extends ConsumerWidget {
   // -------------------------------------------------------------------
   // Yardımcı aksiyonlar
   // -------------------------------------------------------------------
-  static void _snack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  /// Sunucu çağrısını çalıştırır; hata olursa kullanıcıya gösterir.
+  /// RPC'ler yetki ve durum geçişlerini denetlediği için hata gerçek
+  /// bir kural ihlalini işaret eder (örn. sırası gelmemiş bir aksiyon).
+  static Future<void> _run(
+    BuildContext context,
+    Future<void> Function() action, {
+    String? successMessage,
+  }) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+      if (successMessage != null) {
+        messenger.showSnackBar(SnackBar(content: Text(successMessage)));
+      }
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(turkishMatchError(error))),
+      );
+    }
   }
 
   void _confirmReject(
     BuildContext context,
-    PendingMatchesController controller, {
+    MatchActions actions, {
     bool isWithdraw = false,
   }) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text(isWithdraw ? 'Meydan okumayı geri çek' : 'Meydan okumayı reddet'),
+        title: Text(isWithdraw ? 'Teklifi geri çek' : 'Teklifi reddet'),
         content: Text(
           isWithdraw
-              ? '${match.opponentTeamName} takımına gönderdiğiniz meydan okuma iptal edilecek.'
-              : '${match.opponentTeamName} takımının meydan okuması reddedilecek.',
+              ? '${match.opponentTeamName} takımına gönderdiğiniz maç teklifi iptal edilecek.'
+              : '${match.opponentTeamName} takımının maç teklifi reddedilecek.',
         ),
         actions: <Widget>[
           TextButton(
@@ -494,9 +514,15 @@ class _StageActions extends ConsumerWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.loss),
             onPressed: () {
-              controller.rejectChallenge(match.id);
               Navigator.of(dialogContext).pop();
-              _snack(context, isWithdraw ? 'Meydan okuma geri çekildi.' : 'Meydan okuma reddedildi.');
+              _run(
+                context,
+                () => isWithdraw
+                    ? actions.cancel(match.id, reason: 'Teklif geri çekildi')
+                    : actions.reject(match.id),
+                successMessage:
+                    isWithdraw ? 'Teklif geri çekildi.' : 'Teklif reddedildi.',
+              );
             },
             child: Text(isWithdraw ? 'Geri Çek' : 'Reddet'),
           ),
@@ -507,7 +533,7 @@ class _StageActions extends ConsumerWidget {
 
   Future<void> _pickMatchDate(
     BuildContext context,
-    PendingMatchesController controller,
+    MatchActions actions,
   ) async {
     final DateTime now = DateTime.now();
     final DateTime? date = await showDatePicker(
@@ -525,22 +551,25 @@ class _StageActions extends ConsumerWidget {
     );
     if (time == null || !context.mounted) return;
 
-    controller.setMatchDate(
-      match.id,
-      DateTime(date.year, date.month, date.day, time.hour, time.minute),
+    await _run(
+      context,
+      () => actions.setMatchDate(
+        match.id,
+        DateTime(date.year, date.month, date.day, time.hour, time.minute),
+      ),
+      successMessage: 'Maç tarihi kaydedildi.',
     );
-    _snack(context, 'Maç tarihi kaydedildi.');
   }
 
   void _reportResult(
     BuildContext context,
-    PendingMatchesController controller,
+    MatchActions actions,
     TeamOutcome outcome,
-  ) {
-    controller.reportResult(match.id, outcome);
-    _snack(
+  ) async {
+    await _run(
       context,
-      switch (outcome) {
+      () => actions.reportResult(match.id, outcome),
+      successMessage: switch (outcome) {
         TeamOutcome.win => 'Galibiyet kaydedildi. Tebrikler!',
         TeamOutcome.draw => 'Beraberlik kaydedildi.',
         TeamOutcome.loss => 'Mağlubiyet kaydedildi.',

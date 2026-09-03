@@ -1,22 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/mock_data.dart';
+import '../data/supabase_repository.dart';
 import '../models/models.dart';
 import 'auth_controller.dart';
 
+/// Supabase okuma/yazma katmanı.
+final Provider<SupabaseRepository> repositoryProvider =
+    Provider<SupabaseRepository>((Ref ref) => SupabaseRepository(ref.watch(supabaseProvider)));
+
 // =====================================================================
-// KULLANICI  (gerçek Supabase oturumundan gelir, mock değil)
+// KULLANICI
 // =====================================================================
 
 /// Giriş yapmış kullanıcının id'si. Oturum yoksa null.
 final Provider<String?> currentUserIdProvider =
     Provider<String?>((Ref ref) => ref.watch(sessionProvider)?.user.id);
 
-/// Giriş yapmış kullanıcının profili.
-///
-/// `profiles` tablosundan gelir. Profil henüz yüklenmediyse null döner;
-/// [AuthGate] eksiksiz profil olmadan ana kabuğu göstermediği için
-/// sekmelerin içinde pratikte null olmaz.
+/// Giriş yapmış kullanıcının profili (`profiles` tablosundan).
 final Provider<UserProfile?> currentUserProvider = Provider<UserProfile?>((Ref ref) {
   final Map<String, dynamic>? row = ref.watch(myProfileProvider).valueOrNull;
   return row == null ? null : UserProfile.fromRow(row);
@@ -26,276 +26,329 @@ final Provider<UserProfile?> currentUserProvider = Provider<UserProfile?>((Ref r
 // HALI SAHALAR
 // =====================================================================
 
-final Provider<List<Pitch>> pitchesProvider =
-    Provider<List<Pitch>>((Ref ref) => MockData.pitches);
+/// Aktif sahalar, takım sayısıyla birlikte (takım sayısına göre sıralı).
+final FutureProvider<List<Pitch>> pitchesProvider =
+    FutureProvider<List<Pitch>>((Ref ref) {
+  // Oturum değişince yeniden çekilsin.
+  ref.watch(sessionProvider);
+  return ref.watch(repositoryProvider).fetchPitches();
+});
 
-/// Ana sayfa: en çok takım barındıran 3 saha.
-final Provider<List<Pitch>> popularPitchesProvider = Provider<List<Pitch>>((Ref ref) {
-  final List<Pitch> all = <Pitch>[...ref.watch(pitchesProvider)]
-    ..sort((Pitch a, Pitch b) => b.teamCount.compareTo(a.teamCount));
-  return all.take(3).toList(growable: false);
+/// Ana sayfa: en çok takım barındıran ilk 3 saha.
+final Provider<AsyncValue<List<Pitch>>> popularPitchesProvider =
+    Provider<AsyncValue<List<Pitch>>>((Ref ref) {
+  return ref.watch(pitchesProvider).whenData(
+        (List<Pitch> all) => all.take(3).toList(growable: false),
+      );
 });
 
 /// Sahalar sekmesindeki arama metni.
 final StateProvider<String> pitchSearchQueryProvider = StateProvider<String>((Ref ref) => '');
 
 /// Ada, ilçeye veya adrese göre filtrelenmiş saha listesi.
-final Provider<List<Pitch>> filteredPitchesProvider = Provider<List<Pitch>>((Ref ref) {
+final Provider<AsyncValue<List<Pitch>>> filteredPitchesProvider =
+    Provider<AsyncValue<List<Pitch>>>((Ref ref) {
   final String query = ref.watch(pitchSearchQueryProvider).trim().toLowerCase();
-  final List<Pitch> pitches = ref.watch(pitchesProvider);
-  if (query.isEmpty) return pitches;
 
-  return pitches.where((Pitch p) {
-    return p.name.toLowerCase().contains(query) ||
-        p.district.toLowerCase().contains(query) ||
-        p.address.toLowerCase().contains(query);
-  }).toList(growable: false);
+  return ref.watch(pitchesProvider).whenData((List<Pitch> pitches) {
+    if (query.isEmpty) return pitches;
+    return pitches
+        .where((Pitch p) =>
+            p.name.toLowerCase().contains(query) ||
+            p.district.toLowerCase().contains(query) ||
+            p.address.toLowerCase().contains(query))
+        .toList(growable: false);
+  });
+});
+
+/// Tek bir sahayı id'sinden bulur.
+final ProviderFamily<AsyncValue<Pitch?>, String> pitchByIdProvider =
+    Provider.family<AsyncValue<Pitch?>, String>((Ref ref, String pitchId) {
+  return ref.watch(pitchesProvider).whenData(
+        (List<Pitch> all) =>
+            all.where((Pitch p) => p.id == pitchId).firstOrNull,
+      );
 });
 
 // =====================================================================
 // TAKIMLAR
 // =====================================================================
 
-/// Takım listesi — yeni takım oluşturma bu controller üzerinden yapılır.
-class TeamsController extends Notifier<List<Team>> {
-  @override
-  List<Team> build() => MockData.teams;
-
-  /// Saha detayındaki "Takımımı Bu Sahaya Kaydet" akışı.
-  Team createTeam({
-    required String pitchId,
-    required String name,
-    required String contactPhone,
-  }) {
-    final Team team = Team(
-      id: 't-${DateTime.now().millisecondsSinceEpoch}',
-      pitchId: pitchId,
-      captainId: ref.read(currentUserIdProvider) ?? '',
-      name: name,
-      contactPhone: contactPhone,
-    );
-    state = <Team>[...state, team];
-    return team;
-  }
-}
-
-final NotifierProvider<TeamsController, List<Team>> teamsProvider =
-    NotifierProvider<TeamsController, List<Team>>(TeamsController.new);
-
 /// Bir sahaya kayıtlı takımlar — puan durumuna göre sıralı.
-final ProviderFamily<List<Team>, String> teamsForPitchProvider =
-    Provider.family<List<Team>, String>((Ref ref, String pitchId) {
-  final List<Team> teams =
-      ref.watch(teamsProvider).where((Team t) => t.pitchId == pitchId).toList()
-        ..sort((Team a, Team b) => b.points.compareTo(a.points));
-  return teams;
+final FutureProviderFamily<List<Team>, String> teamsForPitchProvider =
+    FutureProvider.family<List<Team>, String>((Ref ref, String pitchId) {
+  ref.watch(sessionProvider);
+  return ref.watch(repositoryProvider).fetchTeamsForPitch(pitchId);
+});
+
+/// Kullanıcının kaptanı olduğu takımlar.
+final FutureProvider<List<Team>> myTeamsProvider = FutureProvider<List<Team>>((Ref ref) {
+  ref.watch(sessionProvider);
+  return ref.watch(repositoryProvider).fetchMyTeams();
 });
 
 /// Kullanıcının BU sahadaki takımı (yoksa null).
 ///
-/// "MEYDAN OKU" butonunun görünürlüğü tamamen buna bağlıdır:
-/// kullanıcının o sahada kayıtlı takımı yoksa buton gizlenir.
+/// "MAÇ TEKLİFİ" butonunun görünürlüğü tamamen buna bağlıdır.
 final ProviderFamily<Team?, String> myTeamForPitchProvider =
     Provider.family<Team?, String>((Ref ref, String pitchId) {
-  final String? uid = ref.watch(currentUserIdProvider);
-  if (uid == null) return null;
-  for (final Team team in ref.watch(teamsProvider)) {
-    if (team.pitchId == pitchId && team.captainId == uid) return team;
-  }
-  return null;
+  final List<Team>? teams = ref.watch(myTeamsProvider).valueOrNull;
+  if (teams == null) return null;
+  return teams.where((Team t) => t.pitchId == pitchId).firstOrNull;
 });
 
-/// Kullanıcının kaptanı olduğu tüm takımlar.
-final Provider<List<Team>> myTeamsProvider = Provider<List<Team>>((Ref ref) {
-  final String? uid = ref.watch(currentUserIdProvider);
-  if (uid == null) return const <Team>[];
-  return ref.watch(teamsProvider).where((Team t) => t.captainId == uid).toList(growable: false);
+/// Takım oluşturma.
+final Provider<Future<Team> Function({
+  required String pitchId,
+  required String name,
+})> createTeamProvider = Provider((Ref ref) {
+  return ({
+    required String pitchId,
+    required String name,
+  }) async {
+    final Team team = await ref.read(repositoryProvider).createTeam(
+          pitchId: pitchId,
+          name: name,
+        );
+    ref.invalidate(myTeamsProvider);
+    ref.invalidate(teamsForPitchProvider(pitchId));
+    ref.invalidate(pitchesProvider); // takım sayısı değişti
+    return team;
+  };
+});
+
+/// Profildeki telefon numarasını günceller.
+///
+/// Numara tek kaynaktan yönetiliyor: profil değişince takım ve kaleci
+/// kayıtları veritabanı trigger'ıyla kendiliğinden güncelleniyor, bu yüzden
+/// burada ilgili tüm sağlayıcılar tazeleniyor.
+final Provider<Future<void> Function(String)> updatePhoneProvider =
+    Provider<Future<void> Function(String)>((Ref ref) {
+  return (String phone) async {
+    await ref.read(repositoryProvider).updateMyPhone(phone);
+    // currentUserProvider myProfileProvider'dan türüyor; asıl tazelenmesi
+    // gereken o.
+    ref.invalidate(myProfileProvider);
+    ref.invalidate(myTeamsProvider);
+    ref.invalidate(myGoalkeeperProvider);
+    ref.invalidate(goalkeepersProvider);
+    ref.invalidate(pendingMatchesProvider);
+  };
 });
 
 // =====================================================================
 // KALECİLER
 // =====================================================================
 
-final Provider<List<Goalkeeper>> goalkeepersProvider =
-    Provider<List<Goalkeeper>>((Ref ref) => MockData.goalkeepers);
-
 /// Kaleci sekmesinde seçili ilçe (null = tüm ilçeler).
 final StateProvider<String?> selectedDistrictProvider = StateProvider<String?>((Ref ref) => null);
 
-/// Seçili ilçeye göre filtrelenmiş, puanı yüksekten düşüğe kaleci listesi.
-final Provider<List<Goalkeeper>> filteredGoalkeepersProvider =
-    Provider<List<Goalkeeper>>((Ref ref) {
+/// Seçili ilçeye göre filtrelenmiş kaleciler (puanı yüksekten düşüğe).
+///
+/// İlçe filtresi veritabanı tarafında uygulanır (`districts @> {ilçe}`).
+final FutureProvider<List<Goalkeeper>> goalkeepersProvider =
+    FutureProvider<List<Goalkeeper>>((Ref ref) {
+  ref.watch(sessionProvider);
   final String? district = ref.watch(selectedDistrictProvider);
-  final List<Goalkeeper> all = ref.watch(goalkeepersProvider);
-
-  final List<Goalkeeper> filtered = district == null
-      ? <Goalkeeper>[...all]
-      : all.where((Goalkeeper g) => g.districts.contains(district)).toList();
-
-  filtered.sort((Goalkeeper a, Goalkeeper b) => b.rating.compareTo(a.rating));
-  return filtered;
+  return ref.watch(repositoryProvider).fetchGoalkeepers(district: district);
 });
 
 /// Kullanıcının kendi kaleci profili — yoksa ana sayfadaki CTA görünür.
-class MyGoalkeeperController extends Notifier<Goalkeeper?> {
+class MyGoalkeeperController extends AsyncNotifier<Goalkeeper?> {
   @override
-  Goalkeeper? build() => MockData.myGoalkeeperProfile;
+  Future<Goalkeeper?> build() {
+    ref.watch(sessionProvider);
+    return ref.watch(repositoryProvider).fetchMyGoalkeeper();
+  }
 
-  void save({
+  Future<void> save({
     required List<String> districts,
     required String about,
-    required String phone,
-    String? avatarUrl,
     bool isAvailable = true,
-  }) {
-    final UserProfile? user = ref.read(currentUserProvider);
-    if (user == null) return;
-    state = Goalkeeper(
-      id: user.id,
-      fullName: user.fullName,
-      age: user.age ?? 0,
-      districts: districts,
-      about: about,
-      phone: phone,
-      rating: state?.rating ?? 0,
-      ratingCount: state?.ratingCount ?? 0,
-      avatarUrl: avatarUrl ?? state?.avatarUrl,
-      isAvailable: isAvailable,
+  }) async {
+    state = const AsyncValue<Goalkeeper?>.loading();
+    state = await AsyncValue.guard<Goalkeeper?>(() async {
+      final SupabaseRepository repo = ref.read(repositoryProvider);
+      await repo.upsertMyGoalkeeper(
+        districts: districts,
+        about: about,
+        isAvailable: isAvailable,
+      );
+      // Liste ekranı da tazelensin ki kaleci hemen görünsün.
+      ref.invalidate(goalkeepersProvider);
+      return repo.fetchMyGoalkeeper();
+    });
+  }
+
+  Future<void> delete() async {
+    state = const AsyncValue<Goalkeeper?>.loading();
+    state = await AsyncValue.guard<Goalkeeper?>(() async {
+      await ref.read(repositoryProvider).deleteMyGoalkeeper();
+      ref.invalidate(goalkeepersProvider);
+      return null;
+    });
+  }
+}
+
+final AsyncNotifierProvider<MyGoalkeeperController, Goalkeeper?> myGoalkeeperProvider =
+    AsyncNotifierProvider<MyGoalkeeperController, Goalkeeper?>(MyGoalkeeperController.new);
+
+// =====================================================================
+// MAÇ TEKLİFLERİ
+// =====================================================================
+
+/// Kullanıcının takımlarını ilgilendiren, sonuçlanmamış maç teklifleri.
+final FutureProvider<List<PendingMatch>> pendingMatchesProvider =
+    FutureProvider<List<PendingMatch>>((Ref ref) {
+  ref.watch(sessionProvider);
+  ref.watch(myTeamsProvider);
+  return ref.watch(repositoryProvider).fetchPendingMatches();
+});
+
+/// Tamamlanmış maçlar, en yeniden eskiye.
+final FutureProvider<List<MatchHistoryEntry>> matchHistoryProvider =
+    FutureProvider<List<MatchHistoryEntry>>((Ref ref) {
+  ref.watch(sessionProvider);
+  ref.watch(myTeamsProvider);
+  return ref.watch(repositoryProvider).fetchMatchHistory();
+});
+
+/// Maç teklifi akışının tüm aksiyonları.
+///
+/// Her aksiyon Supabase'deki ilgili RPC'yi çağırır (yetki ve durum
+/// geçişleri orada denetlenir), sonra listeleri tazeler.
+class MatchActions {
+  const MatchActions(this._ref);
+
+  final Ref _ref;
+
+  SupabaseRepository get _repo => _ref.read(repositoryProvider);
+
+  void _refresh() {
+    _ref.invalidate(pendingMatchesProvider);
+    _ref.invalidate(matchHistoryProvider);
+    _ref.invalidate(myTeamsProvider); // G/B/M değişmiş olabilir
+    _ref.invalidate(notificationsProvider); // trigger yeni bildirim yazmış olabilir
+  }
+
+  Future<void> sendChallenge({
+    required String myTeamId,
+    required String opponentTeamId,
+    String? message,
+  }) async {
+    await _repo.sendChallenge(
+      myTeamId: myTeamId,
+      opponentTeamId: opponentTeamId,
+      message: message,
     );
+    _refresh();
   }
 
-  void delete() => state = null;
+  /// AŞAMA 1 — gelen teklifi kabul et.
+  Future<void> accept(String matchId) async {
+    await _repo.respondToChallenge(matchId: matchId, accept: true);
+    _refresh();
+  }
+
+  /// AŞAMA 1 — gelen teklifi reddet.
+  Future<void> reject(String matchId) async {
+    await _repo.respondToChallenge(matchId: matchId, accept: false);
+    _refresh();
+  }
+
+  /// AŞAMA 2 — "Maça Hazırım". İki taraf da verince maç kesinleşir.
+  Future<void> markReady(String matchId) async {
+    await _repo.confirmMatch(matchId);
+    _refresh();
+  }
+
+  /// AŞAMA 3 — teklifi gönderen takım gün ve saati girer.
+  Future<void> setMatchDate(String matchId, DateTime date) async {
+    await _repo.scheduleMatch(matchId: matchId, date: date);
+    _refresh();
+  }
+
+  /// AŞAMA 4 — sonucu bildir; G/B/M trigger ile güncellenir.
+  Future<void> reportResult(String matchId, TeamOutcome outcome) async {
+    await _repo.reportMatchResult(matchId: matchId, outcome: outcome);
+    _refresh();
+  }
+
+  /// Gönderilen teklifi geri çek veya maçı iptal et.
+  Future<void> cancel(String matchId, {String? reason}) async {
+    await _repo.cancelMatch(matchId: matchId, reason: reason);
+    _refresh();
+  }
 }
 
-final NotifierProvider<MyGoalkeeperController, Goalkeeper?> myGoalkeeperProvider =
-    NotifierProvider<MyGoalkeeperController, Goalkeeper?>(MyGoalkeeperController.new);
+final Provider<MatchActions> matchActionsProvider =
+    Provider<MatchActions>(MatchActions.new);
 
 // =====================================================================
-// MAÇLAR
+// BİLDİRİMLER
 // =====================================================================
 
-/// Bekleyen maçlar ve 4 aşamalı onay akışının tüm aksiyonları.
-class PendingMatchesController extends Notifier<List<PendingMatch>> {
-  @override
-  List<PendingMatch> build() => MockData.pendingMatches;
+/// Kullanıcının bildirimleri (en yeniden eskiye).
+final FutureProvider<List<AppNotification>> notificationsProvider =
+    FutureProvider<List<AppNotification>>((Ref ref) async {
+  // Oturum kapalıysa istek atma.
+  if (ref.watch(currentUserIdProvider) == null) return const <AppNotification>[];
+  return ref.watch(repositoryProvider).fetchNotifications();
+});
 
-  void _update(String matchId, PendingMatch Function(PendingMatch) transform) {
-    state = <PendingMatch>[
-      for (final PendingMatch m in state) if (m.id == matchId) transform(m) else m,
-    ];
+/// Ana sayfadaki zil ikonunun rozetinde gösterilen okunmamış sayısı.
+final Provider<int> unreadNotificationCountProvider = Provider<int>((Ref ref) {
+  final List<AppNotification> all =
+      ref.watch(notificationsProvider).valueOrNull ?? const <AppNotification>[];
+  return all.where((AppNotification n) => !n.isRead).length;
+});
+
+/// Bildirim işlemleri; her işlemden sonra liste yenilenir.
+class NotificationActions {
+  const NotificationActions(this._ref);
+
+  final Ref _ref;
+
+  SupabaseRepository get _repo => _ref.read(repositoryProvider);
+
+  Future<void> markRead(String id) async {
+    await _repo.markNotificationsRead(ids: <String>[id]);
+    _ref.invalidate(notificationsProvider);
   }
 
-  /// AŞAMA 1 — meydan okumayı kabul et. 7 günlük hazırlık sayacı başlar.
-  void acceptChallenge(String matchId) => _update(
-        matchId,
-        (PendingMatch m) => m.copyWith(
-          status: MatchStatus.accepted,
-          acceptedAt: DateTime.now(),
-        ),
-      );
-
-  /// AŞAMA 1 — meydan okumayı reddet.
-  void rejectChallenge(String matchId) {
-    state = state.where((PendingMatch m) => m.id != matchId).toList(growable: false);
+  Future<void> markAllRead() async {
+    await _repo.markNotificationsRead();
+    _ref.invalidate(notificationsProvider);
   }
 
-  /// AŞAMA 2 — "Maça Hazırım". İki taraf da bastıysa maç kesinleşir.
-  void markReady(String matchId) => _update(matchId, (PendingMatch m) {
-        final PendingMatch updated = m.copyWith(myTeamReady: true);
-        return updated.opponentReady
-            ? updated.copyWith(status: MatchStatus.mutuallyAgreed)
-            : updated;
-      });
-
-  /// AŞAMA 3 — meydan okuyan takım maç gün ve saatini girer.
-  void setMatchDate(String matchId, DateTime date) => _update(
-        matchId,
-        (PendingMatch m) => m.copyWith(
-          matchDate: date,
-          status: MatchStatus.scheduled,
-        ),
-      );
-
-  /// AŞAMA 4 — sonucu bildir; maç listeden düşer, geçmişe eklenir.
-  void reportResult(String matchId, TeamOutcome outcome) {
-    final PendingMatch? match = state.cast<PendingMatch?>().firstWhere(
-          (PendingMatch? m) => m?.id == matchId,
-          orElse: () => null,
-        );
-    if (match == null) return;
-
-    ref.read(matchHistoryProvider.notifier).add(
-          MatchHistoryEntry(
-            id: match.id,
-            opponentName: match.opponentTeamName,
-            pitchName: match.pitchName,
-            playedAt: match.matchDate ?? DateTime.now(),
-            outcome: outcome,
-          ),
-        );
-
-    state = state.where((PendingMatch m) => m.id != matchId).toList(growable: false);
-  }
-
-  /// Saha detayından yeni meydan okuma gönderildiğinde listeye eklenir.
-  void sendChallenge({
-    required Team myTeam,
-    required Team opponent,
-    required String pitchName,
-  }) {
-    state = <PendingMatch>[
-      PendingMatch(
-        id: 'm-${DateTime.now().millisecondsSinceEpoch}',
-        myTeamName: myTeam.name,
-        opponentTeamName: opponent.name,
-        opponentPhone: opponent.contactPhone,
-        opponentCaptainName: opponent.name,
-        pitchName: pitchName,
-        status: MatchStatus.pending,
-        isChallenger: true,
-        myTeamReady: false,
-        opponentReady: false,
-      ),
-      ...state,
-    ];
+  Future<void> delete(String id) async {
+    await _repo.deleteNotification(id);
+    _ref.invalidate(notificationsProvider);
   }
 }
 
-final NotifierProvider<PendingMatchesController, List<PendingMatch>> pendingMatchesProvider =
-    NotifierProvider<PendingMatchesController, List<PendingMatch>>(
-  PendingMatchesController.new,
-);
-
-/// Maç geçmişi — her zaman en yeniden eskiye sıralı.
-class MatchHistoryController extends Notifier<List<MatchHistoryEntry>> {
-  @override
-  List<MatchHistoryEntry> build() {
-    final List<MatchHistoryEntry> history = <MatchHistoryEntry>[...MockData.matchHistory];
-    _sort(history);
-    return history;
-  }
-
-  static void _sort(List<MatchHistoryEntry> list) => list
-      .sort((MatchHistoryEntry a, MatchHistoryEntry b) => b.playedAt.compareTo(a.playedAt));
-
-  void add(MatchHistoryEntry entry) {
-    final List<MatchHistoryEntry> next = <MatchHistoryEntry>[entry, ...state];
-    _sort(next);
-    state = next;
-  }
-}
-
-final NotifierProvider<MatchHistoryController, List<MatchHistoryEntry>> matchHistoryProvider =
-    NotifierProvider<MatchHistoryController, List<MatchHistoryEntry>>(
-  MatchHistoryController.new,
-);
+final Provider<NotificationActions> notificationActionsProvider =
+    Provider<NotificationActions>(NotificationActions.new);
 
 // =====================================================================
 // TAKVİM (Ana sayfa)
 // =====================================================================
 
+/// Planlanmış maçlardan türetilen takvim etkinlikleri.
 final Provider<List<CalendarEvent>> calendarEventsProvider =
-    Provider<List<CalendarEvent>>((Ref ref) => MockData.calendarEvents);
+    Provider<List<CalendarEvent>>((Ref ref) {
+  final List<PendingMatch> matches =
+      ref.watch(pendingMatchesProvider).valueOrNull ?? const <PendingMatch>[];
+  return <CalendarEvent>[
+    for (final PendingMatch m in matches)
+      if (m.matchDate != null)
+        CalendarEvent(
+          date: m.matchDate!,
+          title: m.opponentTeamName,
+          subtitle: m.pitchName,
+        ),
+  ];
+});
 
 /// Takvimde seçili gün (varsayılan: bugün).
 final StateProvider<DateTime> selectedDayProvider = StateProvider<DateTime>((Ref ref) {

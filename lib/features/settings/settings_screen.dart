@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/theme_selector.dart';
 import '../../state/auth_controller.dart';
 import '../../state/settings_controller.dart';
 
@@ -24,19 +25,7 @@ class SettingsScreen extends ConsumerWidget {
           const SectionHeader(title: 'Görünüm', icon: Icons.palette_outlined),
           _SettingsGroup(
             children: <Widget>[
-              SwitchListTile.adaptive(
-                value: settings.isDark,
-                onChanged: controller.toggleTheme,
-                secondary: Icon(
-                  settings.isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                ),
-                title: const Text('Koyu Mod'),
-                subtitle: Text(
-                  settings.isDark
-                      ? 'Koyu yeşil & siyah tema aktif'
-                      : 'Koyu yeşil & beyaz tema aktif',
-                ),
-              ),
+              const ThemeSelector(),
               const Divider(height: 1, indent: 16, endIndent: 16),
               _TextScaleTile(
                 value: settings.textScale,
@@ -53,8 +42,8 @@ class SettingsScreen extends ConsumerWidget {
                 value: settings.challengeNotifications,
                 onChanged: controller.setChallengeNotifications,
                 secondary: const Icon(Icons.bolt_rounded),
-                title: const Text('Meydan okuma bildirimleri'),
-                subtitle: const Text('Takımına meydan okunduğunda haber ver'),
+                title: const Text('Maç teklifi bildirimleri'),
+                subtitle: const Text('Takımına maç teklifi geldiğinde haber ver'),
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               SwitchListTile.adaptive(

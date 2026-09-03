@@ -3,6 +3,9 @@
          Flutter bunu debug/profile manifestlerine otomatik ekler ama
          release derlemesinde olmadığı için uygulama internete çıkamaz. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ (API 33) bildirim gostermek icin calisma zamani izni ister.
+         Izin PushService.initialize() icinde talep ediliyor. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:label="Japon Kale"
@@ -43,6 +46,15 @@
              göstermez ve geliştirme için güvenlidir.
              Yayına çıkmadan önce AdMob panelinden aldığın kendi App ID'nle
              değiştir: https://apps.admob.com -->
+        <!-- FCM: uygulama kapaliyken gelen bildirimlerin kullanacagi varsayilan
+             kanal ve ikon. Kanal PushService icinde de ayni id ile olusturuluyor. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="japonkale_matches" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />

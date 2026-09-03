@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:japonkale/core/constants/izmir_districts.dart';
+import 'package:japonkale/features/auth/widgets/auth_widgets.dart';
 import 'package:japonkale/features/shell/main_shell.dart';
 import 'package:japonkale/models/models.dart';
 import 'package:japonkale/state/app_providers.dart';
@@ -39,7 +40,7 @@ void main() {
   });
 
   group('PendingMatch aşama makinesi', () {
-    test('1. aşama: bize meydan okunduysa davet alındı olur', () {
+    test('1. aşama: bize teklif geldiyse davet alındı olur', () {
       expect(
         _match(status: MatchStatus.pending, isChallenger: false).stage,
         PendingMatchStage.invitationReceived,
@@ -96,55 +97,95 @@ void main() {
     });
   });
 
-  group('Onay akışı controller', () {
-    test('markReady iki taraf da hazır olunca maçı kesinleştirir', () {
-      final ProviderContainer container = ProviderContainer();
-      addTearDown(container.dispose);
+  group('Bildirimler', () {
+    test('satır modele çevrilir ve bilinmeyen tip generic olur', () {
+      final AppNotification n = AppNotification.fromRow(<String, dynamic>{
+        'id': 'n1',
+        'type': 'challenge_received',
+        'title': 'Yeni maç teklifi!',
+        'body': 'Ege FC takımı size maç teklifi gönderdi.',
+        'is_read': false,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+        'match_id': 'm1',
+      });
+      expect(n.kind, NotificationKind.challengeReceived);
+      expect(n.isRead, isFalse);
+      expect(n.relativeTime, 'az önce');
+      expect(n.kind.opensMyTeam, isTrue);
 
-      final PendingMatchesController controller =
-          container.read(pendingMatchesProvider.notifier);
-
-      // m-04: biz hazırız, rakip zaten hazır değil -> önce rakip hazır olsun
-      controller.acceptChallenge('m-01');
-      final PendingMatch accepted = container
-          .read(pendingMatchesProvider)
-          .firstWhere((PendingMatch m) => m.id == 'm-01');
-      expect(accepted.stage, PendingMatchStage.readinessPending);
-
-      controller.markReady('m-01');
-      final PendingMatch afterReady = container
-          .read(pendingMatchesProvider)
-          .firstWhere((PendingMatch m) => m.id == 'm-01');
-      // Rakip henüz onaylamadığı için hâlâ 2. aşamada.
-      expect(afterReady.myTeamReady, isTrue);
-      expect(afterReady.stage, PendingMatchStage.readinessPending);
+      final AppNotification unknown = AppNotification.fromRow(<String, dynamic>{
+        'id': 'n2',
+        'type': 'her_neyse',
+        'title': 'x',
+        'is_read': true,
+        'created_at': '',
+      });
+      expect(unknown.kind, NotificationKind.generic);
+      expect(unknown.kind.opensMyTeam, isFalse, reason: 'Genel bildirim sekme değiştirmez');
     });
 
-    test('reportResult maçı listeden çıkarıp geçmişe ekler', () {
-      final ProviderContainer container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      final int historyBefore = container.read(matchHistoryProvider).length;
-      container.read(pendingMatchesProvider.notifier).reportResult('m-07', TeamOutcome.win);
-
-      expect(
-        container.read(pendingMatchesProvider).any((PendingMatch m) => m.id == 'm-07'),
-        isFalse,
-      );
-      expect(container.read(matchHistoryProvider).length, historyBefore + 1);
-      expect(container.read(matchHistoryProvider).first.outcome, TeamOutcome.win);
+    test('göreli zaman saat/gün eşiklerini aşar', () {
+      AppNotification at(Duration ago) => AppNotification(
+            id: 'x',
+            kind: NotificationKind.generic,
+            title: 't',
+            body: '',
+            isRead: false,
+            createdAt: DateTime.now().subtract(ago),
+          );
+      expect(at(const Duration(minutes: 5)).relativeTime, '5 dk önce');
+      expect(at(const Duration(hours: 3)).relativeTime, '3 sa önce');
+      expect(at(const Duration(days: 2)).relativeTime, '2 gün önce');
     });
   });
 
-  group('Popüler sahalar', () {
-    test('en çok takım barındıran 3 saha döner', () {
-      final ProviderContainer container = ProviderContainer();
-      addTearDown(container.dispose);
+  group('Şifre + şifre onay alanları', () {
+    Future<void> pump(WidgetTester tester, GlobalKey<FormState> key,
+        TextEditingController pass, TextEditingController confirm) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Form(
+              key: key,
+              child: PasswordFields(
+                passwordController: pass,
+                confirmController: confirm,
+                obscurePassword: true,
+                obscureConfirm: true,
+                onTogglePassword: () {},
+                onToggleConfirm: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
-      final List<Pitch> popular = container.read(popularPitchesProvider);
-      expect(popular, hasLength(3));
-      expect(popular[0].teamCount >= popular[1].teamCount, isTrue);
-      expect(popular[1].teamCount >= popular[2].teamCount, isTrue);
+    testWidgets('şifreler eşleşmezse doğrulama başarısız olur',
+        (WidgetTester tester) async {
+      final GlobalKey<FormState> key = GlobalKey<FormState>();
+      final TextEditingController pass = TextEditingController(text: 'gizli123');
+      final TextEditingController confirm = TextEditingController(text: 'gizli124');
+      await pump(tester, key, pass, confirm);
+
+      expect(key.currentState!.validate(), isFalse);
+      await tester.pump();
+      expect(find.text('Şifreler eşleşmiyor.'), findsOneWidget);
+    });
+
+    testWidgets('kısa şifre reddedilir, eşleşen uzun şifre kabul edilir',
+        (WidgetTester tester) async {
+      final GlobalKey<FormState> key = GlobalKey<FormState>();
+      final TextEditingController pass = TextEditingController(text: '123');
+      final TextEditingController confirm = TextEditingController(text: '123');
+      await pump(tester, key, pass, confirm);
+      expect(key.currentState!.validate(), isFalse);
+      await tester.pump();
+      expect(find.text('Şifre en az 6 karakter olmalı.'), findsOneWidget);
+
+      pass.text = 'gizli123';
+      confirm.text = 'gizli123';
+      expect(key.currentState!.validate(), isTrue);
     });
   });
 
