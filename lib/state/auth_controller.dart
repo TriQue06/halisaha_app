@@ -203,6 +203,27 @@ class AuthController {
     await _auth.signOut();
   }
 
+  /// Hesabı ve tüm verisini kalıcı olarak siler.
+  ///
+  /// Play Store, hesap açan uygulamalarda uygulama içi silme yolunu
+  /// zorunlu tutuyor. Silme işini `delete_my_account()` RPC'si yapıyor:
+  /// istemci `auth.users` tablosuna yazamadığı için (service_role anahtarı
+  /// APK'ya konulamaz) security definer bir fonksiyon gerekiyor.
+  ///
+  /// Fonksiyon dönünce oturum token'ı artık geçersizdir; yerel oturumu da
+  /// temizleyip kullanıcıyı giriş ekranına düşürüyoruz.
+  Future<void> deleteAccount() async {
+    await PushService.unregister();
+    await _client.rpc<void>('delete_my_account');
+    // Sunucudaki kullanıcı gitti; buradaki hata "zaten yok" demektir,
+    // silme başarılı olduğu için yutuyoruz.
+    try {
+      await _auth.signOut();
+    } on AuthException {
+      // yoksayılır
+    }
+  }
+
   /// Google veya telefonla girenlerin eksik profilini tamamlar.
   Future<void> completeProfile({
     required String firstName,
