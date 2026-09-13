@@ -60,9 +60,16 @@ class PitchDetailScreen extends ConsumerWidget {
             expandedHeight: 210,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
+              // Renk sabit: FlexibleSpaceBar başlığı AppBar'ın foregroundColor'ını
+              // değil temanın metin rengini alıyor; açık temada koyu kalıp
+              // yeşil/karartılmış zeminde okunmuyordu.
               title: Text(
                 pitch.name,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               titlePadding: const EdgeInsets.only(left: 52, right: 16, bottom: 14),
               background: Stack(
