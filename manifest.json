@@ -1,0 +1,36 @@
+{
+    "name": "Japon Kale",
+    "short_name": "Japon Kale",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0B6B3A",
+    "theme_color": "#0B6B3A",
+    "description": "Japon Kale - İzmir halı saha maç ve kaleci bulma uygulaması.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "lang": "tr"
+}
