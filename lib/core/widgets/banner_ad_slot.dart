@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -29,6 +30,8 @@ class _BannerAdSlotState extends State<BannerAdSlot> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // AdMob'un web implementasyonu yok; web'de yuva hiç yer kaplamaz.
+    if (kIsWeb) return;
     if (_ad == null) _load();
   }
 

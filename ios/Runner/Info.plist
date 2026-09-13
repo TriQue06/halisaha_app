@@ -79,5 +79,9 @@
 	<array>
 		<string>tel</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Profil fotoğrafı seçmek için galerine erişim gerekiyor.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Profil fotoğrafı çekmek için kamerana erişim gerekiyor.</string>
 </dict>
 </plist>

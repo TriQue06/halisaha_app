@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/utils/avatar_image.dart';
 import '../models/models.dart';
 
 /// Supabase okuma/yazma işlemleri.
@@ -102,6 +105,80 @@ class SupabaseRepository {
       params: <String, dynamic>{'p_phone': phone},
     );
     return result as String? ?? phone;
+  }
+
+  // -------------------------------------------------------------------
+  // PROFİL FOTOĞRAFI
+  // -------------------------------------------------------------------
+
+  /// Fotoğrafı `avatars/<uid>/` klasörüne yükler, profile yazar ve eski
+  /// dosyaları siler. Yeni public URL'yi döndürür.
+  ///
+  /// Dosya adı her yüklemede değişiyor (zaman damgası): aynı adın üzerine
+  /// yazılsaydı CDN ve görsel önbelleği eski fotoğrafı göstermeye devam
+  /// ederdi.
+  Future<String> uploadMyAvatar(Uint8List bytes) async {
+    final String uid = _avatarOwnerId();
+
+    final AvatarImageType? type = AvatarImageType.detect(bytes);
+    if (type == null) {
+      throw const FormatException('Yalnızca JPEG, PNG veya WebP fotoğraf yüklenebilir.');
+    }
+    if (bytes.length > AvatarImageType.maxBytes) {
+      throw const FormatException('Fotoğraf çok büyük (en fazla 2 MB).');
+    }
+
+    final StorageFileApi bucket = _client.storage.from(kAvatarBucket);
+    final List<String> oldPaths = await _listAvatarPaths(uid);
+
+    final String path =
+        '$uid/avatar_${DateTime.now().millisecondsSinceEpoch}.${type.extension}';
+    await bucket.uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(contentType: type.mimeType),
+    );
+    final String url = bucket.getPublicUrl(path);
+
+    await _client.from('profiles').update(<String, dynamic>{'avatar_url': url}).eq('id', uid);
+
+    // Eskileri profil yeni fotoğrafa geçtikten SONRA sil; önce silinseydi
+    // arada kısa bir süre kırık görsel görünürdü.
+    if (oldPaths.isNotEmpty) {
+      try {
+        await bucket.remove(oldPaths);
+      } catch (_) {
+        // Temizlik başarısız olsa da yükleme tamamlandı; artık kullanılmayan
+        // dosya bir sonraki değişiklikte yeniden silinmeye çalışılır.
+      }
+    }
+    return url;
+  }
+
+  /// Profil fotoğrafını kaldırır: önce profildeki bağlantıyı siler, sonra
+  /// kullanıcının klasöründeki dosyaları.
+  ///
+  /// Google ile girenlerde fotoğraf Google'dan gelen bir URL'dir; klasör
+  /// boştur ve yalnızca bağlantı silinir.
+  Future<void> removeMyAvatar() async {
+    final String uid = _avatarOwnerId();
+    await _client.from('profiles').update(<String, dynamic>{'avatar_url': null}).eq('id', uid);
+
+    final List<String> paths = await _listAvatarPaths(uid);
+    if (paths.isNotEmpty) {
+      await _client.storage.from(kAvatarBucket).remove(paths);
+    }
+  }
+
+  String _avatarOwnerId() {
+    final String? uid = _client.auth.currentUser?.id;
+    if (uid == null) throw StateError('Oturum bulunamadı.');
+    return uid;
+  }
+
+  Future<List<String>> _listAvatarPaths(String uid) async {
+    final List<FileObject> files = await _client.storage.from(kAvatarBucket).list(path: uid);
+    return <String>[for (final FileObject file in files) '$uid/${file.name}'];
   }
 
   Future<void> deleteMyGoalkeeper() async {

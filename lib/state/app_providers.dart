@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/supabase_repository.dart';
@@ -135,6 +137,37 @@ final Provider<Future<void> Function(String)> updatePhoneProvider =
     ref.invalidate(pendingMatchesProvider);
   };
 });
+
+/// Profil fotoğrafı yükleme / değiştirme / kaldırma.
+///
+/// Fotoğraf `profiles.avatar_url` alanından okunuyor; kaleci listesi aynı
+/// alanı view üzerinden gösterdiği için profil ve kaleci sağlayıcıları
+/// birlikte tazeleniyor.
+class AvatarActions {
+  const AvatarActions(this._ref);
+
+  final Ref _ref;
+
+  void _refresh() {
+    _ref.invalidate(myProfileProvider);
+    _ref.invalidate(myGoalkeeperProvider);
+    _ref.invalidate(goalkeepersProvider);
+  }
+
+  /// Yeni fotoğrafı yükler; varsa eskisinin yerine geçer.
+  Future<void> upload(Uint8List bytes) async {
+    await _ref.read(repositoryProvider).uploadMyAvatar(bytes);
+    _refresh();
+  }
+
+  Future<void> remove() async {
+    await _ref.read(repositoryProvider).removeMyAvatar();
+    _refresh();
+  }
+}
+
+final Provider<AvatarActions> avatarActionsProvider =
+    Provider<AvatarActions>(AvatarActions.new);
 
 // =====================================================================
 // KALECİLER

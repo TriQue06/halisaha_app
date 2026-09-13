@@ -8,6 +8,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
 import 'goalkeeper_profile_editor.dart';
+import 'widgets/avatar_editor.dart';
 import 'widgets/phone_editor.dart';
 import 'widgets/pending_match_card.dart';
 
@@ -80,14 +81,40 @@ class _ProfileHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.white.withValues(alpha: 0.18),
-            // Google ile girenlerde profil fotoğrafı buradan gelir.
-            foregroundImage: (user?.avatarUrl?.isNotEmpty ?? false)
-                ? NetworkImage(user!.avatarUrl!)
-                : null,
-            child: const Icon(Icons.person_rounded, size: 34, color: Colors.white),
+          // Dokununca fotoğraf yükle / değiştir / kaldır.
+          GestureDetector(
+            onTap: user == null ? null : () => showAvatarEditor(context),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  // Kullanıcının yüklediği ya da Google hesabından gelen fotoğraf.
+                  foregroundImage: (user?.avatarUrl?.isNotEmpty ?? false)
+                      ? NetworkImage(user!.avatarUrl!)
+                      : null,
+                  child: const Icon(Icons.person_rounded, size: 34, color: Colors.white),
+                ),
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: AppColors.midGreen,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera_rounded,
+                      size: 13,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(

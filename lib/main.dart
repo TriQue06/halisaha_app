@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,12 +23,17 @@ Future<void> main() async {
     publishableKey: AppConfig.supabasePublishableKey,
   );
 
-  // Push bildirimleri. Kendi içinde hata yakalıyor: Firebase kurulmamış bir
-  // ortamda bile uygulama normal açılmaya devam eder.
-  await PushService.initialize();
+  // Web sürümünde push bildirimi ve AdMob yok: ikisinin de web
+  // implementasyonu bulunmuyor (AdMob yalnızca Android/iOS). Web, arkadaş
+  // testleri için hafif bir önizleme; bildirim ve reklam mobil uygulamada.
+  if (!kIsWeb) {
+    // Push bildirimleri. Kendi içinde hata yakalıyor: Firebase kurulmamış bir
+    // ortamda bile uygulama normal açılmaya devam eder.
+    await PushService.initialize();
 
-  // Reklamlar. Başarısız olursa uygulama reklamsız çalışmaya devam eder.
-  await AdService.initialize();
+    // Reklamlar. Başarısız olursa uygulama reklamsız çalışmaya devam eder.
+    await AdService.initialize();
+  }
 
   runApp(const ProviderScope(child: JaponKaleApp()));
 }

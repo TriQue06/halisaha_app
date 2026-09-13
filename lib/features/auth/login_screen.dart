@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -132,29 +133,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: _emailForm(),
               ),
 
-              const SizedBox(height: 22),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: AuthDivider(),
-              ),
-              const SizedBox(height: 16),
-
               // --- Google ------------------------------------------
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: AppConfig.isGoogleSignInConfigured
-                    ? GoogleSignInButton(
-                        onPressed: _isBusy ? null : _signInWithGoogle,
-                        isLoading: _isGoogleBusy,
-                      )
-                    : Text(
-                        'Google girişi henüz yapılandırılmadı '
-                        '(AppConfig.googleWebClientId boş).',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-              ),
+              // Web'de gizli: native akış (google_sign_in -> idToken ->
+              // signInWithIdToken) web'de idToken döndürmüyor. Web önizlemesi
+              // e-posta girişiyle kullanılıyor.
+              if (!kIsWeb) ...<Widget>[
+                const SizedBox(height: 22),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: AuthDivider(),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: AppConfig.isGoogleSignInConfigured
+                      ? GoogleSignInButton(
+                          onPressed: _isBusy ? null : _signInWithGoogle,
+                          isLoading: _isGoogleBusy,
+                        )
+                      : Text(
+                          'Google girişi henüz yapılandırılmadı '
+                          '(AppConfig.googleWebClientId boş).',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                ),
+              ],
               const SizedBox(height: 26),
 
               // --- Kayıt bağlantısı --------------------------------

@@ -5,6 +5,7 @@ import '../../core/constants/izmir_districts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import 'widgets/avatar_editor.dart';
 import 'widgets/phone_editor.dart';
 
 /// "Kaleci Profilim" formu.
@@ -128,11 +129,7 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
                         shape: const CircleBorder(),
                         child: InkWell(
                           customBorder: const CircleBorder(),
-                          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Fotoğraf seçimi (image_picker) burada bağlanacak.'),
-                            ),
-                          ),
+                          onTap: () => showAvatarEditor(context),
                           child: const Padding(
                             padding: EdgeInsets.all(7),
                             child: Icon(Icons.photo_camera_rounded,
@@ -276,8 +273,9 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
   }
 }
 
-/// Kaleci profilinde fotoğraf: önce kaleci profilininki, yoksa hesabınki
-/// (Google ile girenlerde bu dolu gelir).
+/// Kaleci profilinde fotoğraf. Kaleci kaydı fotoğrafı profilden okuyor
+/// (tek kaynak `profiles.avatar_url`); kaleci kaydı henüz yoksa ya da
+/// tazelenmediyse hesabınki gösterilir.
 ImageProvider<Object>? _avatarImage(Goalkeeper? existing, UserProfile? user) {
   final String? url = (existing?.avatarUrl?.isNotEmpty ?? false)
       ? existing!.avatarUrl

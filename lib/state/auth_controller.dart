@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
+import '../core/utils/avatar_image.dart';
 import '../core/services/push_service.dart';
 
 /// Supabase istemcisi.
@@ -214,6 +215,9 @@ class AuthController {
   /// temizleyip kullanıcıyı giriş ekranına düşürüyoruz.
   Future<void> deleteAccount() async {
     await PushService.unregister();
+    // Storage dosyaları auth.users silinince kendiliğinden gitmiyor (ayrı
+    // servis). Oturum ve yetki hâlâ geçerliyken temizliyoruz.
+    await _removeOwnAvatarFiles();
     await _client.rpc<void>('delete_my_account');
     // Sunucudaki kullanıcı gitti; buradaki hata "zaten yok" demektir,
     // silme başarılı olduğu için yutuyoruz.
@@ -221,6 +225,23 @@ class AuthController {
       await _auth.signOut();
     } on AuthException {
       // yoksayılır
+    }
+  }
+
+  /// Kullanıcının profil fotoğrafı klasörünü boşaltır.
+  ///
+  /// Hata hesap silmeyi durdurmaz: Play şartı silmenin engellenmemesi.
+  /// Kalan dosya hiçbir profile bağlı olmaz.
+  Future<void> _removeOwnAvatarFiles() async {
+    final String? uid = _auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final StorageFileApi bucket = _client.storage.from(kAvatarBucket);
+      final List<FileObject> files = await bucket.list(path: uid);
+      if (files.isEmpty) return;
+      await bucket.remove(<String>[for (final FileObject file in files) '$uid/${file.name}']);
+    } catch (_) {
+      // yoksayılır, bkz. yukarıdaki açıklama
     }
   }
 

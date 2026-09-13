@@ -3,9 +3,9 @@
     "short_name": "Japon Kale",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B6B3A",
+    "theme_color": "#0B6B3A",
+    "description": "Japon Kale - İzmir halı saha maç ve kaleci bulma uygulaması.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
@@ -31,5 +31,6 @@
             "type": "image/png",
             "purpose": "maskable"
         }
-    ]
+    ],
+    "lang": "tr"
 }
