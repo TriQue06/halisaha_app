@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hesap Silme · Japon Kale</title>
+<meta name="description" content="Japon Kale hesabını ve verilerini silme adımları ve silme talebi.">
+<style>
+  :root {
+    --bg: #f3f6f4; --surface: #ffffff; --text: #10201a; --muted: #5f6f67;
+    --border: #dce5df; --accent: #0b6b3a; --accent-soft: #eaf1ec; --danger: #d9453d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f0d; --surface: #151b18; --text: #ecf3ee; --muted: #9baaa2;
+      --border: #2a3631; --accent: #3ccf86; --accent-soft: #1e2723; --danger: #ff6b62;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { background: #0b6b3a; color: #fff; padding: 32px 20px 28px; }
+  header .wrap { max-width: 680px; margin: 0 auto; }
+  header p { margin: 4px 0 0; opacity: .85; font-size: 14px; }
+  h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 20px 56px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px; margin: 0 0 14px;
+  }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  p { margin: 8px 0; }
+  ol, ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  a { color: var(--accent); }
+  kbd {
+    font: 600 14px ui-monospace, Menlo, Consolas, monospace;
+    background: var(--accent-soft); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1px 6px;
+  }
+  .button {
+    display: inline-block; margin-top: 8px; padding: 12px 18px; border-radius: 10px;
+    background: #0b6b3a; color: #fff; text-decoration: none; font-weight: 600;
+  }
+  .warn { color: var(--danger); font-weight: 600; }
+  .muted { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Hesap ve Veri Silme</h1>
+    <p>Japon Kale · Ömer Ali Sarıkan ve Barış Tanlık</p>
+  </div>
+</header>
+<main>
+
+<section>
+  <h2>Uygulamadan silme (en hızlı yol)</h2>
+  <ol>
+    <li>Japon Kale uygulamasını aç ve hesabına giriş yap.</li>
+    <li>Alttaki menüden <strong>Ayarlar</strong> sekmesine geç.</li>
+    <li><strong>Hesap</strong> bölümünde <strong>Hesabımı Sil</strong>'e dokun.</li>
+    <li>Onay kutusuna <kbd>SİL</kbd> yaz ve <strong>Kalıcı Olarak Sil</strong>'e dokun.</li>
+  </ol>
+  <p>Hesabın ve verilerin anında silinir, uygulama giriş ekranına döner.</p>
+</section>
+
+<section>
+  <h2>Uygulamaya erişemiyorsan</h2>
+  <p>Uygulamayı kaldırdıysan, telefonunu değiştirdiysen ya da giriş yapamıyorsan bize e-posta ile silme talebi gönder:</p>
+  <ul>
+    <li>Talebi <strong>hesabına kayıtlı e-posta adresinden</strong> gönder. Böylece hesabın sahibi olduğunu doğrulayabiliriz.</li>
+    <li>Konu satırına <strong>"Hesap silme talebi"</strong> yaz.</li>
+    <li>Google veya Apple ile giriş yaptıysan hangisini kullandığını belirt.</li>
+  </ul>
+  <a class="button" href="mailto:omersarikan35@gmail.com?subject=Hesap%20silme%20talebi&amp;body=Japon%20Kale%20hesab%C4%B1m%C4%B1n%20ve%20t%C3%BCm%20verilerimin%20silinmesini%20talep%20ediyorum.%0A%0AKay%C4%B1tl%C4%B1%20e-posta%20adresim%3A%20%0AGiri%C5%9F%20y%C3%B6ntemim%20(e-posta%20%2F%20Google%20%2F%20Apple)%3A%20">Silme talebi gönder</a>
+  <p class="muted">E-posta uygulaman açılmazsa talebini doğrudan <a href="mailto:omersarikan35@gmail.com">omersarikan35@gmail.com</a> adresine gönderebilirsin.</p>
+  <p>Talebini en geç <strong>30 gün</strong> içinde sonuçlandırır ve sana e-posta ile bilgi veririz.</p>
+</section>
+
+<section>
+  <h2>Neler silinir</h2>
+  <ul>
+    <li>Hesabın ve giriş bilgilerin</li>
+    <li>Ad, soyad, doğum tarihi, telefon numarası, ilçe ve profil fotoğrafı</li>
+    <li>Takımların, maç teklifleri ve maç geçmişin</li>
+    <li>Kaleci profilin ve aldığın ya da verdiğin puanlar</li>
+    <li>Bildirimlerin ve cihaz bildirim anahtarların</li>
+    <li>Apple ile giriş yaptıysan Apple'daki uygulama yetkin iptal edilir</li>
+  </ul>
+  <p class="warn">Silme işlemi geri alınamaz.</p>
+  <p>Silinen veriler, hizmet sağlayıcılarımızın teknik yedeklerinde ve güvenlik kayıtlarında sınırlı bir süre daha kalabilir; bu kayıtlar başka bir amaçla kullanılmaz. Ayrıntılar için <a href="gizlilik.html">Gizlilik Politikası</a>.</p>
+</section>
+
+<section>
+  <h2>Yalnızca bazı verileri silmek istersen</h2>
+  <ul>
+    <li><strong>Profil fotoğrafı:</strong> Profilim → fotoğrafa dokun → Fotoğrafı kaldır</li>
+    <li><strong>Kaleci profili ve kaleci telefon numarası:</strong> Profilim → Kaleci Profilim → profili sil</li>
+    <li><strong>Bildirimler:</strong> Bildirimler ekranında tek tek silebilirsin</li>
+  </ul>
+  <p>Başka bir verinin silinmesini istiyorsan yukarıdaki adrese yaz.</p>
+</section>
+
+</main>
+</body>
+</html>
