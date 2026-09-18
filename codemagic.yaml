@@ -1,0 +1,67 @@
+# =====================================================================
+# Codemagic — iOS derleme ve TestFlight yükleme
+#
+# Mac gerekmez: Codemagic buluttaki Mac'te derler, imzalar ve yükler.
+#
+# Codemagic panelinde bir kez yapılacaklar:
+#  1. Teams → Integrations → Developer Portal: App Store Connect API
+#     anahtarını ekle; adını aşağıdaki "app_store_connect" değeriyle AYNI yap.
+#  2. Uygulama → Environment variables → "ios_config" grubuna ekle:
+#       GOOGLE_IOS_CLIENT_ID       166383252757-xxxx.apps.googleusercontent.com
+#       GOOGLE_REVERSED_CLIENT_ID  com.googleusercontent.apps.166383252757-xxxx
+#       FIREBASE_IOS_API_KEY       GoogleService-Info.plist → API_KEY
+#       FIREBASE_IOS_APP_ID        GoogleService-Info.plist → GOOGLE_APP_ID
+#       APP_STORE_APPLE_ID         App Store Connect → Uygulama → Apple ID (sayı)
+#     Hiçbiri gizli değil; değişince kod commit'i gerekmesin diye burada.
+# =====================================================================
+
+workflows:
+  ios-release:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    integrations:
+      app_store_connect: JaponKale ASC
+
+    environment:
+      flutter: 3.47.2
+      xcode: latest
+      cocoapods: default
+      groups:
+        - ios_config
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.japonkale.app
+
+    scripts:
+      - name: Bağımlılıklar
+        script: flutter pub get
+
+      - name: Google iOS URL şeması
+        script: |
+          sed -i '' "s/^GOOGLE_REVERSED_CLIENT_ID=.*/GOOGLE_REVERSED_CLIENT_ID=${GOOGLE_REVERSED_CLIENT_ID}/" ios/Flutter/AppConfig.xcconfig
+          grep GOOGLE_REVERSED_CLIENT_ID ios/Flutter/AppConfig.xcconfig
+
+      - name: İmzalama profilleri
+        script: xcode-project use-profiles
+
+      - name: IPA derle
+        script: |
+          # TestFlight'taki son build numarasının bir fazlası; ilk yüklemede 1.
+          LATEST=$(app-store-connect get-latest-testflight-build-number "${APP_STORE_APPLE_ID}" 2>/dev/null || echo 0)
+          flutter build ipa --release \
+            --build-number=$((LATEST + 1)) \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=GOOGLE_IOS_CLIENT_ID=${GOOGLE_IOS_CLIENT_ID} \
+            --dart-define=FIREBASE_IOS_API_KEY=${FIREBASE_IOS_API_KEY} \
+            --dart-define=FIREBASE_IOS_APP_ID=${FIREBASE_IOS_APP_ID}
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

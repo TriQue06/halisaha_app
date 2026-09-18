@@ -386,7 +386,7 @@ class _StageActions extends ConsumerWidget {
                 'tarihinde ${match.pitchName} sahasında.',
               ),
             ),
-            if (match.isChallenger)
+            if (match.isChallenger && match.canReschedule)
               TextButton(
                 onPressed: () => _pickMatchDate(context, actions),
                 child: const Text('Değiştir'),
@@ -536,27 +536,52 @@ class _StageActions extends ConsumerWidget {
     MatchActions actions,
   ) async {
     final DateTime now = DateTime.now();
+    final DateTime today = DateUtils.dateOnly(now);
+    final DateTime lastDate = now.add(const Duration(days: 90));
+
+    // showDatePicker, başlangıç günü firstDate'ten önceyse hata veriyor.
+    // Kayıtlı tarih geçmişte kaldıysa (ör. gece yarısına yakın maç) ya da
+    // aralık dışındaysa varsayılana dön.
+    DateTime initialDate = match.matchDate ?? now.add(const Duration(days: 1));
+    if (initialDate.isBefore(today) || initialDate.isAfter(lastDate)) {
+      initialDate = now.add(const Duration(days: 1));
+    }
+
     final DateTime? date = await showDatePicker(
       context: context,
-      initialDate: match.matchDate ?? now.add(const Duration(days: 1)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 90)),
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: lastDate,
       locale: const Locale('tr', 'TR'),
     );
     if (date == null || !context.mounted) return;
 
+    final DateTime? existing = match.matchDate;
     final TimeOfDay? time = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 21, minute: 0),
+      initialTime: existing == null
+          ? const TimeOfDay(hour: 21, minute: 0)
+          : TimeOfDay.fromDateTime(existing),
     );
     if (time == null || !context.mounted) return;
 
+    final DateTime picked =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+
+    // Takvim geçmiş günleri zaten engelliyor ama bugünün geçmiş bir saati
+    // seçilebiliyor. Sunucu da reddediyor; kullanıcıyı istek atmadan uyar.
+    if (!picked.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Geçmiş bir saat seçtin. Maç saati şu andan sonra olmalı.'),
+        ),
+      );
+      return;
+    }
+
     await _run(
       context,
-      () => actions.setMatchDate(
-        match.id,
-        DateTime(date.year, date.month, date.day, time.hour, time.minute),
-      ),
+      () => actions.setMatchDate(match.id, picked),
       successMessage: 'Maç tarihi kaydedildi.',
     );
   }

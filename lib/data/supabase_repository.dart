@@ -316,7 +316,10 @@ class SupabaseRepository {
             id: row['match_id'] as String,
             opponentName: (row['opponent_name'] as String?) ?? '—',
             pitchName: (row['pitch_name'] as String?) ?? '—',
-            playedAt: DateTime.tryParse(row['played_at'] as String? ?? '') ?? DateTime.now(),
+            // Yerel saate çevrilmezse 00:00-03:00 (TR) arası maçlar bir
+            // önceki güne yazılıyordu; liste yalnızca gün gösteriyor.
+            playedAt: DateTime.tryParse(row['played_at'] as String? ?? '')?.toLocal() ??
+                DateTime.now(),
             outcome: switch (row['outcome'] as String?) {
               'win' => TeamOutcome.win,
               'loss' => TeamOutcome.loss,

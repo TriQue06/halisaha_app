@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/phone_launcher.dart';
-import '../../core/widgets/banner_ad_slot.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
@@ -122,20 +121,12 @@ class GoalkeepersScreen extends ConsumerWidget {
                     );
                   }
 
-                  // Reklam listenin SONUNA konuyor, kartların arasına
-                  // değil: kartların altında "İletişime Geç" butonu var ve
-                  // AdMob tıklanabilir öğeye bitişik reklamı yasaklıyor.
                   return ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    itemCount: list.length + 1,
+                    itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (BuildContext context, int index) {
-                      if (index == list.length) {
-                        return const BannerAdSlot(
-                          padding: EdgeInsets.only(top: 6),
-                        );
-                      }
                       final Goalkeeper goalkeeper = list[index];
                       return GoalkeeperCard(
                         goalkeeper: goalkeeper,

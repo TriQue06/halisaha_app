@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/config/app_config.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../state/auth_controller.dart';
 import 'email_otp_screen.dart';
 import 'widgets/auth_widgets.dart';
@@ -31,7 +33,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _passwordConfirmController = TextEditingController();
+  final TextEditingController _passwordConfirmController =
+      TextEditingController();
 
   DateTime? _birthDate;
   bool _obscurePassword = true;
@@ -178,7 +181,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   child: Text(
                     _birthDate == null
                         ? 'Seç'
-                        : DateFormat('d MMMM yyyy', 'tr_TR').format(_birthDate!),
+                        : DateFormat('d MMMM yyyy', 'tr_TR')
+                            .format(_birthDate!),
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: _birthDate == null
                           ? theme.colorScheme.onSurfaceVariant
@@ -230,25 +234,51 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               // --- Koşullar -----------------------------------------
               CheckboxListTile(
                 value: _acceptedTerms,
-                onChanged: (bool? v) => setState(() => _acceptedTerms = v ?? false),
+                onChanged: (bool? v) =>
+                    setState(() => _acceptedTerms = v ?? false),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                title: Text(
-                  'Kullanım koşullarını ve gizlilik politikasını kabul ediyorum.',
-                  style: theme.textTheme.bodySmall,
+                title: Text.rich(
+                  TextSpan(
+                    style: theme.textTheme.bodySmall,
+                    children: <InlineSpan>[
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.baseline,
+                        baseline: TextBaseline.alphabetic,
+                        child: GestureDetector(
+                          onTap: () => openExternalLink(
+                              context, AppConfig.privacyPolicyUrl),
+                          child: Text(
+                            'Gizlilik politikasını',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                              decorationColor: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const TextSpan(
+                          text:
+                              ' okudum ve kabul ediyorum. 18 yaşından büyüğüm.'),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
 
-              if (_error != null && _error != 'Doğum tarihini seç.') ...<Widget>[
+              if (_error != null &&
+                  _error != 'Doğum tarihini seç.') ...<Widget>[
                 AuthErrorBox(message: _error!),
                 const SizedBox(height: 16),
               ],
 
               FilledButton(
                 onPressed: _isBusy ? null : _submit,
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52)),
                 child: _isBusy
                     ? const SizedBox(
                         width: 20,

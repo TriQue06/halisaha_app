@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../core/config/app_config.dart';
 import '../../state/auth_controller.dart';
@@ -28,6 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _isBusy = false;
   bool _isGoogleBusy = false;
+  bool _isAppleBusy = false;
   String? _error;
 
   @override
@@ -82,6 +84,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isAppleBusy = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(authControllerProvider).signInWithApple();
+    } catch (error) {
+      _setError(error);
+    } finally {
+      if (mounted) setState(() => _isAppleBusy = false);
+    }
+  }
+
   Future<void> _forgotPassword() async {
     final String email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
@@ -94,7 +111,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       // Kod ekranına geç: akış uygulama içinde tamamlanıyor.
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => ResetPasswordScreen(email: email)),
+        MaterialPageRoute<void>(
+            builder: (_) => ResetPasswordScreen(email: email)),
       );
     } catch (error) {
       _setError(error);
@@ -144,21 +162,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: AuthDivider(),
                 ),
                 const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: AppConfig.isGoogleSignInConfigured
-                      ? GoogleSignInButton(
-                          onPressed: _isBusy ? null : _signInWithGoogle,
-                          isLoading: _isGoogleBusy,
-                        )
-                      : Text(
-                          'Google girişi henüz yapılandırılmadı '
-                          '(AppConfig.googleWebClientId boş).',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                ),
+                // Apple ile Giriş yalnızca iOS'ta; App Store kuralı 4.8 gereği
+                // Google'dan önce ve aynı boyutta.
+                if (AppConfig.isIos) ...<Widget>[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: SizedBox(
+                      height: 50,
+                      child: _isAppleBusy
+                          ? const Center(child: CircularProgressIndicator())
+                          : SignInWithAppleButton(
+                              text: 'Apple ile devam et',
+                              style: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? SignInWithAppleButtonStyle.white
+                                  : SignInWithAppleButtonStyle.black,
+                              onPressed: _isBusy || _isGoogleBusy
+                                  ? () {}
+                                  : _signInWithApple,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Yapılandırılmamış platformda (ör. iOS client ID'siz derleme)
+                // buton hiç gösterilmez; kullanıcıya geliştirici notu çıkmasın.
+                if (AppConfig.isGoogleSignInConfigured)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: GoogleSignInButton(
+                      onPressed: _isBusy ? null : _signInWithGoogle,
+                      isLoading: _isGoogleBusy,
+                    ),
+                  ),
               ],
               const SizedBox(height: 26),
 
@@ -173,7 +209,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const SignUpScreen()),
+                      MaterialPageRoute<void>(
+                          builder: (_) => const SignUpScreen()),
                     ),
                     child: const Text('Kayıt ol'),
                   ),
@@ -205,7 +242,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             validator: (String? value) {
               final String v = value?.trim() ?? '';
               if (v.isEmpty) return 'E-posta adresini gir.';
-              if (!v.contains('@') || !v.contains('.')) return 'Geçerli bir e-posta gir.';
+              if (!v.contains('@') || !v.contains('.')) {
+                return 'Geçerli bir e-posta gir.';
+              }
               return null;
             },
           ),
@@ -219,7 +258,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               labelText: 'Şifre',
               prefixIcon: const Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
                 icon: Icon(
                   _obscurePassword
                       ? Icons.visibility_outlined
@@ -239,12 +279,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           FilledButton(
             onPressed: _isBusy ? null : _signInWithEmail,
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
             child: _isBusy
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
                 : const Text('Giriş Yap'),
           ),
@@ -252,5 +294,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-
 }

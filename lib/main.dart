@@ -6,7 +6,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
-import 'core/services/ad_service.dart';
 import 'core/services/push_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_gate.dart';
@@ -23,16 +22,12 @@ Future<void> main() async {
     publishableKey: AppConfig.supabasePublishableKey,
   );
 
-  // Web sürümünde push bildirimi ve AdMob yok: ikisinin de web
-  // implementasyonu bulunmuyor (AdMob yalnızca Android/iOS). Web, arkadaş
-  // testleri için hafif bir önizleme; bildirim ve reklam mobil uygulamada.
+  // Web sürümünde push bildirimi yok (web implementasyonu kurulu değil).
+  // Web, arkadaş testleri için hafif bir önizleme; bildirim mobil uygulamada.
   if (!kIsWeb) {
     // Push bildirimleri. Kendi içinde hata yakalıyor: Firebase kurulmamış bir
     // ortamda bile uygulama normal açılmaya devam eder.
     await PushService.initialize();
-
-    // Reklamlar. Başarısız olursa uygulama reklamsız çalışmaya devam eder.
-    await AdService.initialize();
   }
 
   runApp(const ProviderScope(child: JaponKaleApp()));

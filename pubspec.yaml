@@ -21,12 +21,6 @@ dependencies:
   # State Management (Durum Yönetimi)
   flutter_riverpod: ^2.5.1
 
-  # Reklam Entegrasyonu (AdMob)
-  # NOT: 5.x sürümü Flutter 3.47'nin Gradle'ıyla derlenmiyor
-  # ("Could not get unknown property 'all' for configuration container").
-  # 9.x bu sorunu çözüyor; henüz reklam kodu yazılmadığı için API farkı önemsiz.
-  google_mobile_ads: ^9.1.0
-
   # Push bildirimi (Firebase Cloud Messaging)
   # firebase_core her Firebase paketinin ön koşulu.
   firebase_core: ^3.6.0
@@ -42,6 +36,8 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.3
+  sign_in_with_apple: ^8.2.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

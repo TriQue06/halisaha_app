@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Uygulama genelindeki yapılandırma sabitleri.
 ///
 /// Buradaki değerlerin hiçbiri gizli değildir; hepsi istemciye gömülmek
@@ -33,7 +35,55 @@ abstract final class AppConfig {
 
   /// Google girişi yapılandırılmış mı? Değilse giriş ekranındaki
   /// Google butonu gizlenir (çalışmayan buton göstermek yerine).
-  static bool get isGoogleSignInConfigured => googleWebClientId.isNotEmpty;
+  /// Google Cloud → Credentials → **iOS** tipindeki OAuth client ID'si.
+  ///
+  /// iOS'ta Google hesap ekranını açmak için gerekiyor (Android bunu
+  /// SHA-1 ile çözüyor). Codemagic derlemesinde `--dart-define` ile gelir.
+  static const String googleIosClientId =
+      String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
+
+  /// Google girişi bu platformda yapılandırılmış mı? Değilse giriş
+  /// ekranındaki Google butonu gizlenir. iOS'ta ayrıca iOS client ID'si
+  /// şart: yoksa google_sign_in uygulamayı çökertir.
+  static bool get isGoogleSignInConfigured =>
+      googleWebClientId.isNotEmpty && (!isIos || googleIosClientId.isNotEmpty);
+
+  // -------------------------------------------------------------------
+  // Platform
+  // -------------------------------------------------------------------
+  static bool get isIos =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  static const String bundleId = 'com.japonkale.app';
+
+  // -------------------------------------------------------------------
+  // Firebase (yalnızca iOS)
+  // -------------------------------------------------------------------
+  // Android değerleri google-services.json'dan Gradle eklentisiyle geliyor.
+  // iOS'ta aynı işi GoogleService-Info.plist yapardı ama o dosyanın Xcode
+  // projesine eklenmesi Mac gerektiriyor; bu yüzden değerleri koddan
+  // veriyoruz. Hiçbiri gizli değil (plist de uygulamaya gömülü).
+  static const String firebaseIosApiKey =
+      String.fromEnvironment('FIREBASE_IOS_API_KEY');
+  static const String firebaseIosAppId =
+      String.fromEnvironment('FIREBASE_IOS_APP_ID');
+  static const String firebaseMessagingSenderId = '166383252757';
+  static const String firebaseProjectId = 'japon-kale';
+  static const String firebaseStorageBucket = 'japon-kale.firebasestorage.app';
+
+  static bool get isFirebaseIosConfigured =>
+      firebaseIosApiKey.isNotEmpty && firebaseIosAppId.isNotEmpty;
+
+  // -------------------------------------------------------------------
+  // Yasal sayfalar (GitHub Pages)
+  // -------------------------------------------------------------------
+  /// Play Console ve App Store Connect'e girilen adreslerle AYNI olmalı.
+  static const String privacyPolicyUrl =
+      'https://trique06.github.io/halisaha_app/gizlilik.html';
+
+  /// Uygulamaya giremeyenler için hesap silme talebi sayfası (Play şartı).
+  static const String accountDeletionUrl =
+      'https://trique06.github.io/halisaha_app/hesap-silme.html';
 
   // -------------------------------------------------------------------
   // Telefon

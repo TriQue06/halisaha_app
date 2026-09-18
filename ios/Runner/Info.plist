@@ -83,5 +83,18 @@
 	<string>Profil fotoğrafı seçmek için galerine erişim gerekiyor.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Profil fotoğrafı çekmek için kamerana erişim gerekiyor.</string>
+	<!-- Google ile Giris: Google hesap ekranindan uygulamaya donus semasi.
+	     Deger ios/Flutter/AppConfig.xcconfig icindeki derleme degiskeninden gelir. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

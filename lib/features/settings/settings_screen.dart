@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/theme_selector.dart';
 import '../../state/auth_controller.dart';
@@ -36,7 +38,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
 
           // --- BİLDİRİMLER ---------------------------------------------
-          const SectionHeader(title: 'Bildirimler', icon: Icons.notifications_none_rounded),
+          const SectionHeader(
+              title: 'Bildirimler', icon: Icons.notifications_none_rounded),
           _SettingsGroup(
             children: <Widget>[
               SwitchListTile.adaptive(
@@ -44,7 +47,8 @@ class SettingsScreen extends ConsumerWidget {
                 onChanged: controller.setChallengeNotifications,
                 secondary: const Icon(Icons.bolt_rounded),
                 title: const Text('Maç teklifi bildirimleri'),
-                subtitle: const Text('Takımına maç teklifi geldiğinde haber ver'),
+                subtitle:
+                    const Text('Takımına maç teklifi geldiğinde haber ver'),
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               SwitchListTile.adaptive(
@@ -66,13 +70,22 @@ class SettingsScreen extends ConsumerWidget {
           ),
 
           // --- HAKKINDA ------------------------------------------------
-          const SectionHeader(title: 'Uygulama', icon: Icons.info_outline_rounded),
+          const SectionHeader(
+              title: 'Uygulama', icon: Icons.info_outline_rounded),
           _SettingsGroup(
             children: <Widget>[
               const ListTile(
                 leading: Icon(Icons.verified_outlined),
                 title: Text('Sürüm'),
                 trailing: Text('1.0.0'),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Gizlilik Politikası'),
+                trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                onTap: () =>
+                    openExternalLink(context, AppConfig.privacyPolicyUrl),
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               ListTile(
@@ -173,7 +186,8 @@ class _TextScaleTile extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.format_size_rounded, color: theme.colorScheme.onSurfaceVariant),
+              Icon(Icons.format_size_rounded,
+                  color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -181,7 +195,8 @@ class _TextScaleTile extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       'Yazı Boyutu',
-                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     Text(
                       '$_label · ${(value * 100).round()}%',
@@ -196,7 +211,8 @@ class _TextScaleTile extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: <Widget>[
-              const Text('A', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const Text('A',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
               Expanded(
                 child: Slider(
                   value: value,
@@ -208,7 +224,8 @@ class _TextScaleTile extends StatelessWidget {
                   onChanged: onChanged,
                 ),
               ),
-              const Text('A', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+              const Text('A',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
             ],
           ),
           // Canlı önizleme
@@ -255,7 +272,8 @@ class _DeleteAccountDialog extends ConsumerStatefulWidget {
   const _DeleteAccountDialog();
 
   @override
-  ConsumerState<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+  ConsumerState<_DeleteAccountDialog> createState() =>
+      _DeleteAccountDialogState();
 }
 
 class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {

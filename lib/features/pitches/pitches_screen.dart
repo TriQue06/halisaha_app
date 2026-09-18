@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/banner_ad_slot.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
@@ -69,17 +68,13 @@ class PitchesScreen extends ConsumerWidget {
                 ],
               );
             }
-            // Son eleman reklam yuvası: listenin altında, kartların
-            // arasında değil (saha kartları tıklanabilir).
             return ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-              itemCount: list.length + 1,
+              itemCount: list.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (BuildContext context, int index) =>
-                  index == list.length
-                      ? const BannerAdSlot(padding: EdgeInsets.only(top: 8))
-                      : _PitchListTile(pitch: list[index]),
+                  _PitchListTile(pitch: list[index]),
             );
           },
         ),

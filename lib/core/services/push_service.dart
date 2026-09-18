@@ -6,11 +6,42 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_config.dart';
+
 /// Bildirim kanalı kimliği.
 ///
 /// AndroidManifest'teki `default_notification_channel_id` ile **aynı** olmak
 /// zorunda; uygulama kapalıyken FCM bu kanalı kullanıyor.
 const String kMatchChannelId = 'japonkale_matches';
+
+/// Firebase'i platforma uygun yapılandırmayla başlatır.
+///
+/// Android `google-services.json`'u Gradle eklentisiyle okuyor. iOS'ta
+/// GoogleService-Info.plist yerine [AppConfig] değerleri kullanılıyor;
+/// eksikse hata fırlatılır ve [PushService.initialize] bunu yakalayıp
+/// uygulamayı bildirimsiz çalıştırmaya devam eder.
+Future<void> initializeFirebase() async {
+  if (Firebase.apps.isNotEmpty) return;
+  if (!AppConfig.isIos) {
+    await Firebase.initializeApp();
+    return;
+  }
+  if (!AppConfig.isFirebaseIosConfigured) {
+    throw StateError(
+      'Firebase iOS yapılandırılmamış: FIREBASE_IOS_API_KEY / FIREBASE_IOS_APP_ID.',
+    );
+  }
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: AppConfig.firebaseIosApiKey,
+      appId: AppConfig.firebaseIosAppId,
+      messagingSenderId: AppConfig.firebaseMessagingSenderId,
+      projectId: AppConfig.firebaseProjectId,
+      storageBucket: AppConfig.firebaseStorageBucket,
+      iosBundleId: AppConfig.bundleId,
+    ),
+  );
+}
 
 /// Uygulama arka plandayken/kapalıyken gelen mesajlar bu fonksiyonda işlenir.
 ///
@@ -20,7 +51,7 @@ const String kMatchChannelId = 'japonkale_matches';
 /// hatası veriyor. Top-level olmak ZORUNDA (sınıf içine alınamaz).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await initializeFirebase();
 }
 
 /// Push bildirimlerinin tek giriş noktası.
@@ -52,7 +83,7 @@ class PushService {
     _initialized = true;
 
     try {
-      await Firebase.initializeApp();
+      await initializeFirebase();
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 

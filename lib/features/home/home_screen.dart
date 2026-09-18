@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/banner_ad_slot.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
@@ -125,10 +124,6 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            // Reklam: takvimin altında, hiçbir aksiyon butonuna bitişik değil.
-            const SliverToBoxAdapter(child: BannerAdSlot(
-              padding: EdgeInsets.fromLTRB(12, 16, 12, 0),
-            )),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),

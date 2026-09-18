@@ -1,0 +1,12 @@
+// Uygulamaya ozel iOS derleme degiskenleri (surum kontrolunde).
+//
+// GOOGLE_REVERSED_CLIENT_ID: Google Cloud'daki iOS OAuth client ID'sinin
+// ters cevrilmis hali, ornek:
+//   client ID : 166383252757-abc123.apps.googleusercontent.com
+//   ters hali : com.googleusercontent.apps.166383252757-abc123
+// Info.plist'teki URL semasi bunu okur; Google girisi ekrani bu sema
+// olmadan uygulamaya geri donemez ve uygulama cokerdi.
+//
+// Codemagic derlemesinde bu satir ortam degiskeniyle doldurulur
+// (codemagic.yaml). Bos kalirsa uygulama iOS'ta Google butonunu gizler.
+GOOGLE_REVERSED_CLIENT_ID=com.googleusercontent.apps.unset

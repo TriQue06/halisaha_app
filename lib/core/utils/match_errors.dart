@@ -19,6 +19,11 @@ String turkishMatchError(Object error) {
     if (text.contains('kendisine mac teklifi')) {
       return 'Bir takım kendisine maç teklifi gönderemez.';
     }
+    // Uygulama geçmiş saati göndermeden önce uyarıyor; bu, cihaz saati
+    // yanlışsa ya da seçim ile kayıt arasında saat geçtiyse görülür.
+    if (text.contains('gelecekte olmalidir')) {
+      return 'Maç saati şu andan sonra olmalı. Lütfen ileri bir saat seç.';
+    }
     // Fonksiyonlarımızın raise ettiği mesajlar zaten Türkçe.
     return error.message;
   }

@@ -20,7 +20,7 @@
 -keep class androidx.room.** { *; }
 -dontwarn androidx.room.paging.**
 
-# --- WorkManager (google_mobile_ads üzerinden geliyor) ----------------
+# --- WorkManager (Google kütüphaneleri dolaylı ekleyebiliyor) ---------
 -keep class androidx.work.** { *; }
 -keep class * extends androidx.work.ListenableWorker { <init>(...); }
 -dontwarn androidx.work.**
@@ -36,9 +36,6 @@
 -keep class com.google.android.gms.** { *; }
 -dontwarn com.google.android.gms.**
 
-# --- Google Mobile Ads -----------------------------------------------
--keep class com.google.android.gms.ads.** { *; }
--keep class com.google.ads.** { *; }
 
 # --- Flutter ---------------------------------------------------------
 # Flutter eklenti kaydı yansıma kullanıyor.

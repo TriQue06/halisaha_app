@@ -355,6 +355,16 @@ class PendingMatch {
     return DateTime.now().isAfter(date.add(const Duration(hours: 1)));
   }
 
+  /// Maç gün/saati hâlâ değiştirilebilir mi?
+  ///
+  /// Tarih henüz girilmediyse ya da maç saati gelmediyse evet. Maç
+  /// başladıktan sonra tarihi ileri almak sonuç sorusunu erteleyeceği için
+  /// kapalı.
+  bool get canReschedule {
+    final DateTime? date = matchDate;
+    return date == null || date.isAfter(DateTime.now());
+  }
+
   /// İletişim bilgisi yalnızca iki taraf da hazır olduğunda açılır.
   bool get isContactVisible =>
       status == MatchStatus.mutuallyAgreed || status == MatchStatus.scheduled;

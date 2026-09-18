@@ -81,6 +81,29 @@ void main() {
       expect(match.isContactVisible, isTrue);
     });
 
+    test('maç tarihi yalnızca maç saati gelmeden değiştirilebilir', () {
+      expect(
+        _match(status: MatchStatus.mutuallyAgreed).canReschedule,
+        isTrue,
+        reason: 'Tarih henüz girilmedi',
+      );
+      expect(
+        _match(
+          status: MatchStatus.scheduled,
+          matchDate: DateTime.now().add(const Duration(hours: 2)),
+        ).canReschedule,
+        isTrue,
+      );
+      // Maç başladı ama sonuç süresi (1 saat) henüz dolmadı: kart hâlâ
+      // 3. aşamada, yine de tarih değiştirilememeli.
+      final PendingMatch started = _match(
+        status: MatchStatus.scheduled,
+        matchDate: DateTime.now().subtract(const Duration(minutes: 20)),
+      );
+      expect(started.stage, PendingMatchStage.confirmed);
+      expect(started.canReschedule, isFalse);
+    });
+
     test('4. aşama: maç saati + 1 saat geçince sonuç istenir', () {
       final DateTime past = DateTime.now().subtract(const Duration(hours: 3));
       expect(
