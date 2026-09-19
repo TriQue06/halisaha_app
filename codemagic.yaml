@@ -13,6 +13,20 @@
 #       FIREBASE_IOS_APP_ID        GoogleService-Info.plist → GOOGLE_APP_ID
 #       APP_STORE_APPLE_ID         App Store Connect → Uygulama → Apple ID (sayı)
 #     Hiçbiri gizli değil; değişince kod commit'i gerekmesin diye burada.
+#  3. Aynı ekranda "ios_signing" grubuna ekle (hepsini "Secure" işaretle):
+#       APP_STORE_CONNECT_ISSUER_ID       App Store Connect → Users and Access →
+#                                         Integrations → Issuer ID
+#       APP_STORE_CONNECT_KEY_IDENTIFIER  aynı sayfadaki API anahtarının Key ID'si
+#       APP_STORE_CONNECT_PRIVATE_KEY     o anahtarın .p8 dosyasının tam içeriği
+#       CERTIFICATE_PRIVATE_KEY           dağıtım sertifikasının RSA özel anahtarı;
+#                                         bir kez üretilir:
+#                                         ssh-keygen -t rsa -b 2048 -m PEM -f cert_key
+#                                         (parola sorunca iki kez Enter) → cert_key
+#                                         dosyasının tam içeriği
+#
+# İmzalama tamamen otomatik: sertifika ve App Store profili her derlemede
+# Apple'dan çekilir, yoksa oluşturulur. Codemagic panelinde elle profil
+# yüklemek GEREKMEZ.
 # =====================================================================
 
 workflows:
@@ -30,9 +44,7 @@ workflows:
       cocoapods: default
       groups:
         - ios_config
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.japonkale.app
+        - ios_signing
 
     scripts:
       - name: Bağımlılıklar
@@ -43,8 +55,13 @@ workflows:
           sed -i '' "s/^GOOGLE_REVERSED_CLIENT_ID=.*/GOOGLE_REVERSED_CLIENT_ID=${GOOGLE_REVERSED_CLIENT_ID}/" ios/Flutter/AppConfig.xcconfig
           grep GOOGLE_REVERSED_CLIENT_ID ios/Flutter/AppConfig.xcconfig
 
-      - name: İmzalama profilleri
-        script: xcode-project use-profiles
+      - name: İmzalama (sertifika + App Store profili)
+        script: |
+          keychain initialize
+          # Profil yoksa oluşturur; varsa ve geçerliyse onu kullanır.
+          app-store-connect fetch-signing-files "com.japonkale.app" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
 
       - name: IPA derle
         script: |
