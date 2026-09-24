@@ -11,9 +11,13 @@ import 'login_screen.dart';
 ///
 /// Üç durum:
 ///   1. Oturum yok            -> [LoginScreen]
-///   2. Oturum var, profil eksik -> [CompleteProfileScreen]
-///      (Google ve telefon girişinde ad/doğum tarihi/telefon gelmez)
-///   3. Oturum var, profil tam   -> [MainShell]
+///   2. Oturum var, profilde ad-soyad yok -> [CompleteProfileScreen]
+///   3. Oturum var, ad-soyad var          -> [MainShell]
+///
+/// Apple ve Google ad-soyadı kendileri veriyor; o kullanıcılar hiçbir ek
+/// ekran görmeden ana sayfaya düşer (App Store Guideline 4 - Design).
+/// Eksik doğum tarihi veya telefon burada yol kesmez: profil sekmesindeki
+/// "Profilini tamamla" kartından doldurulur.
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 

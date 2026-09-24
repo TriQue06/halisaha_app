@@ -120,6 +120,40 @@ void main() {
     });
   });
 
+  group('Profil tamamlık kuralı', () {
+    // App Store, Apple ile girişin ardından ek bilgi isteyen kayıt
+    // ekranını reddetti: Apple ad-soyad veriyor ama doğum tarihi vermiyor.
+    test('ad ve soyad yeterli; doğum tarihi ve telefon aranmaz', () {
+      expect(
+        isProfileComplete(<String, dynamic>{
+          'first_name': 'Barış',
+          'last_name': 'Tanlık',
+        }),
+        isTrue,
+        reason: 'Apple ile giren kullanıcı doğrudan uygulamaya girmeli',
+      );
+      expect(
+        isProfileComplete(<String, dynamic>{
+          'first_name': 'Barış',
+          'last_name': 'Tanlık',
+          'birth_date': '1995-04-12',
+          'phone': '+905321112233',
+        }),
+        isTrue,
+      );
+    });
+
+    test('ad ya da soyad eksikse profil tamam değil', () {
+      expect(isProfileComplete(null), isFalse);
+      expect(isProfileComplete(<String, dynamic>{}), isFalse);
+      expect(
+        isProfileComplete(<String, dynamic>{'first_name': 'Barış', 'last_name': '  '}),
+        isFalse,
+        reason: 'Boşluktan ibaret soyad dolu sayılmamalı',
+      );
+    });
+  });
+
   group('Bildirimler', () {
     test('satır modele çevrilir ve bilinmeyen tip generic olur', () {
       final AppNotification n = AppNotification.fromRow(<String, dynamic>{

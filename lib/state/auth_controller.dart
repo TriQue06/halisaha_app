@@ -46,20 +46,22 @@ final FutureProvider<Map<String, dynamic>?> myProfileProvider =
       .maybeSingle();
 });
 
-/// Profil, takım kurmaya ve kaleci profiline yetecek kadar dolu mu?
+/// Profil, uygulamayı kullanmaya yetecek kadar dolu mu?
 ///
-/// Google ve telefon girişinde ad/soyad/doğum tarihi/telefon eksik gelir;
-/// bu yüzden istemci tarafında da aynı kontrolü yapıyoruz
-/// (veritabanındaki `is_profile_complete()` ile aynı kurallar).
+/// **Yalnızca ad ve soyad.** Doğum tarihi bilerek aranmıyor: Apple ile
+/// girişte ad, soyad ve e-posta Apple'dan geliyor ama doğum tarihi
+/// gelmiyor. Doğum tarihi de zorunlu tutulunca Apple ile giren herkes
+/// girişin hemen ardından kayıt ekranına düşüyordu ve App Store bunu
+/// reddetti (Guideline 4 - Design, Sign in with Apple).
+///
+/// Telefon da burada aranmaz; takım kurarken ve kaleci profilinde
+/// ayrıca isteniyor. Veritabanındaki `is_profile_complete()` ile aynı
+/// kurallar.
 bool isProfileComplete(Map<String, dynamic>? profile) {
   if (profile == null) return false;
   bool filled(String key) =>
       (profile[key] as String?)?.trim().isNotEmpty ?? false;
-  // Telefon burada aranmaz: takım kurarken ve kaleci profilinde ayrıca
-  // isteniyor. Veritabanındaki is_profile_complete() ile aynı kurallar.
-  return filled('first_name') &&
-      filled('last_name') &&
-      profile['birth_date'] != null;
+  return filled('first_name') && filled('last_name');
 }
 
 /// Kimlik doğrulama işlemleri.
@@ -362,7 +364,7 @@ class AuthController {
   Future<void> completeProfile({
     required String firstName,
     required String lastName,
-    required DateTime birthDate,
+    DateTime? birthDate,
     String? phone,
     String? district,
   }) async {
@@ -374,7 +376,7 @@ class AuthController {
     await _client.from('profiles').update(<String, dynamic>{
       'first_name': firstName.trim(),
       'last_name': lastName.trim(),
-      'birth_date': _isoDate(birthDate),
+      if (birthDate != null) 'birth_date': _isoDate(birthDate),
       if (phone != null && phone.trim().isNotEmpty)
         'phone': normalizePhone(phone),
       if (district != null) 'district': district,

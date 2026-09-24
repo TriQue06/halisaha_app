@@ -8,11 +8,15 @@ import '../../core/constants/izmir_districts.dart';
 import '../../state/auth_controller.dart';
 import 'widgets/auth_widgets.dart';
 
-/// Google ile giren kullanıcıların eksik profilini tamamlar.
+/// Eksik profil bilgilerini tamamlama ekranı.
 ///
-/// Google ad/soyad ve avatar verir ama **doğum tarihi vermez**. Ad, soyad
-/// ve doğum tarihi zorunlu; telefon isteğe bağlı (takım kurarken ve kaleci
-/// profilinde zaten ayrıca isteniyor).
+/// İki yoldan açılır:
+///  * [AuthGate] tarafından, profilde ad-soyad yoksa,
+///  * Profil sekmesindeki "Profilini tamamla" kartından (geri dönülebilir).
+///
+/// **Yalnızca ad ve soyad zorunlu.** Doğum tarihi ve telefon isteğe bağlı:
+/// Apple ile girişte Apple bunları vermiyor ve App Store, Apple girişinin
+/// ardından ek bilgi isteyen kayıt ekranını reddediyor (Guideline 4).
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
 
@@ -101,11 +105,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_birthDate == null) {
-      setState(() => _error = 'Doğum tarihini seç.');
-      return;
-    }
-
     setState(() {
       _isBusy = true;
       _error = null;
@@ -115,12 +114,16 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       await ref.read(authControllerProvider).completeProfile(
             firstName: _firstNameController.text,
             lastName: _lastNameController.text,
-            birthDate: _birthDate!,
+            birthDate: _birthDate,
             phone: _phoneController.text,
             district: _district,
           );
       // Profili yeniden çek; AuthGate tamamlanmış görüp MainShell'e geçer.
       ref.invalidate(myProfileProvider);
+      // Profil sekmesinden açıldıysa geri dön.
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (error) {
       if (mounted) setState(() => _error = turkishAuthError(error));
     } finally {
@@ -147,8 +150,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
             children: <Widget>[
               const AuthHeader(
                 title: 'Profilini tamamla',
-                subtitle: 'Takım kurmak ve rakiplerle iletişim için '
-                    'birkaç bilgiye daha ihtiyacımız var.',
+                subtitle: 'Ad ve soyadın yeterli. Doğum tarihi ve telefon '
+                    'isteğe bağlı, sonra da ekleyebilirsin.',
               ),
               const SizedBox(height: 24),
 
@@ -219,7 +222,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       borderRadius: BorderRadius.circular(16),
                       child: InputDecorator(
                         decoration: const InputDecoration(
-                          labelText: 'Doğum tarihi',
+                          labelText: 'Doğum tarihi (isteğe bağlı)',
                           prefixIcon: Icon(Icons.cake_outlined),
                         ),
                         child: Text(

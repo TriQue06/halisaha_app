@@ -81,6 +81,11 @@ abstract final class AppConfig {
   static const String privacyPolicyUrl =
       'https://trique06.github.io/halisaha_app/gizlilik.html';
 
+  /// Kullanım koşulları (EULA). App Store, hesap açılan ekranlarda bu
+  /// metne erişilmesini istiyor.
+  static const String termsUrl =
+      'https://trique06.github.io/halisaha_app/kullanim-kosullari.html';
+
   /// Uygulamaya giremeyenler için hesap silme talebi sayfası (Play şartı).
   static const String accountDeletionUrl =
       'https://trique06.github.io/halisaha_app/hesap-silme.html';

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../../core/widgets/legal_consent.dart';
+
 import '../../core/config/app_config.dart';
 import '../../state/auth_controller.dart';
 import 'reset_password_screen.dart';
@@ -30,6 +32,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isBusy = false;
   bool _isGoogleBusy = false;
   bool _isAppleBusy = false;
+
+  /// Sosyal giriş hesabı da açtığı için koşul onayı burada da gerekiyor
+  /// (App Store: hesap açılan her ekranda koşullara erişim + onay).
+  bool _acceptedTerms = false;
   String? _error;
 
   @override
@@ -70,6 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
+    if (!_requireTermsAccepted()) return;
     setState(() {
       _isGoogleBusy = true;
       _error = null;
@@ -85,6 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _signInWithApple() async {
+    if (!_requireTermsAccepted()) return;
     setState(() {
       _isAppleBusy = true;
       _error = null;
@@ -97,6 +105,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isAppleBusy = false);
     }
+  }
+
+  /// Onay kutusu işaretli değilse kullanıcıya nedenini söyler.
+  bool _requireTermsAccepted() {
+    if (_acceptedTerms) return true;
+    _setError('Devam etmek için kullanım koşullarını ve gizlilik '
+        'politikasını kabul etmelisin.');
+    return false;
   }
 
   Future<void> _forgotPassword() async {
@@ -161,7 +177,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   padding: EdgeInsets.symmetric(horizontal: 24),
                   child: AuthDivider(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: LegalConsent(
+                    value: _acceptedTerms,
+                    onChanged: (bool v) => setState(() => _acceptedTerms = v),
+                    enabled: !_isBusy && !_isGoogleBusy && !_isAppleBusy,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 // Apple ile Giriş yalnızca iOS'ta; App Store kuralı 4.8 gereği
                 // Google'dan önce ve aynı boyutta.
                 if (AppConfig.isIos) ...<Widget>[
@@ -177,7 +202,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       Brightness.dark
                                   ? SignInWithAppleButtonStyle.white
                                   : SignInWithAppleButtonStyle.black,
-                              onPressed: _isBusy || _isGoogleBusy
+                              onPressed: _isBusy || _isGoogleBusy || !_acceptedTerms
                                   ? () {}
                                   : _signInWithApple,
                             ),
@@ -191,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: GoogleSignInButton(
-                      onPressed: _isBusy ? null : _signInWithGoogle,
+                      onPressed: _isBusy || !_acceptedTerms ? null : _signInWithGoogle,
                       isLoading: _isGoogleBusy,
                     ),
                   ),

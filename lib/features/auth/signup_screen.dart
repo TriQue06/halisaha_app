@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/config/app_config.dart';
-import '../../core/utils/link_launcher.dart';
+import '../../core/widgets/legal_consent.dart';
 import '../../state/auth_controller.dart';
 import 'email_otp_screen.dart';
 import 'widgets/auth_widgets.dart';
@@ -232,40 +231,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               const SizedBox(height: 12),
 
               // --- Koşullar -----------------------------------------
-              CheckboxListTile(
+              LegalConsent(
                 value: _acceptedTerms,
-                onChanged: (bool? v) =>
-                    setState(() => _acceptedTerms = v ?? false),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text.rich(
-                  TextSpan(
-                    style: theme.textTheme.bodySmall,
-                    children: <InlineSpan>[
-                      WidgetSpan(
-                        alignment: PlaceholderAlignment.baseline,
-                        baseline: TextBaseline.alphabetic,
-                        child: GestureDetector(
-                          onTap: () => openExternalLink(
-                              context, AppConfig.privacyPolicyUrl),
-                          child: Text(
-                            'Gizlilik politikasını',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.underline,
-                              decorationColor: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const TextSpan(
-                          text:
-                              ' okudum ve kabul ediyorum. 18 yaşından büyüğüm.'),
-                    ],
-                  ),
-                ),
+                onChanged: (bool v) => setState(() => _acceptedTerms = v),
+                enabled: !_isBusy,
               ),
               const SizedBox(height: 8),
 

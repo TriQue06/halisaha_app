@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import '../auth/complete_profile_screen.dart';
 import 'goalkeeper_profile_editor.dart';
 import 'widgets/avatar_editor.dart';
 import 'widgets/phone_editor.dart';
@@ -42,10 +43,70 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ];
           },
-          body: const TabBarView(
+          body: Column(
             children: <Widget>[
-              _MyTeamTab(),
-              GoalkeeperProfileEditor(embedded: true),
+              // Doğum tarihi ve telefon girişte zorunlu değil (Apple ile
+              // girişte Apple bunları vermiyor); eksikse burada hatırlatılır.
+              if (user != null && (user.birthDate == null || user.phone.isEmpty))
+                _CompleteProfileBanner(user: user),
+              const Expanded(
+                child: TabBarView(
+                  children: <Widget>[
+                    _MyTeamTab(),
+                    GoalkeeperProfileEditor(embedded: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Eksik profil bilgisi hatırlatması.
+///
+/// Giriş akışını kesmiyoruz (App Store, Apple ile girişten sonra ek kayıt
+/// ekranı istemiyor); eksikler uygulamanın içinde, isteğe bağlı olarak
+/// tamamlanıyor.
+class _CompleteProfileBanner extends StatelessWidget {
+  const _CompleteProfileBanner({required this.user});
+
+  final UserProfile user;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final List<String> missing = <String>[
+      if (user.birthDate == null) 'doğum tarihin',
+      if (user.phone.isEmpty) 'telefon numaran',
+    ];
+
+    return Material(
+      color: theme.colorScheme.secondaryContainer,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const CompleteProfileScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.info_outline_rounded,
+                  size: 20, color: theme.colorScheme.onSecondaryContainer),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Profilini tamamla: ${missing.join(' ve ')} eksik.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSecondaryContainer),
             ],
           ),
         ),
