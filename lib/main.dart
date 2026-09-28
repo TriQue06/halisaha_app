@@ -21,6 +21,8 @@ void main() {
   runApp(const ProviderScope(child: JaponKaleApp()));
 }
 
+bool _supabaseInitialized = false;
+
 /// Uygulamanın kullanılabilmesi için gereken hazırlık.
 ///
 /// [AppBootstrap] bunu açılış animasyonuyla aynı anda çalıştırır ve bitene
@@ -29,14 +31,16 @@ Future<void> _initializeServices() async {
   // Türkçe tarih/ay isimleri için yerelleştirme verisini yükle.
   await initializeDateFormatting('tr_TR');
 
-  // Tekrar denemede ikinci kez başlatılmasın.
-  try {
-    Supabase.instance;
-  } catch (_) {
+  // "Tekrar dene"de ikinci kez başlatılmasın. Kendi bayrağımızı tutuyoruz:
+  // Supabase.instance'ın "başlatılmadı" kontrolü yalnızca bir assert ve
+  // release derlemesinde hiç çalışmıyor. Ona güvenildiğinde release'de
+  // Supabase hiç başlatılmıyor, uygulama gri ekranda kalıyordu.
+  if (!_supabaseInitialized) {
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
       publishableKey: AppConfig.supabasePublishableKey,
     );
+    _supabaseInitialized = true;
   }
 
   // Web sürümünde push bildirimi yok (web implementasyonu kurulu değil).
