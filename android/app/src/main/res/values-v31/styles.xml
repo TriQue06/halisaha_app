@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ sistem acilis ekrani (SplashScreen API): yesil zemin,
+         gorunur ikon yok. NormalTheme values/styles.xml'den gelir. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_empty_icon</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+</resources>

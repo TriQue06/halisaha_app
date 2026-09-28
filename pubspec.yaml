@@ -63,3 +63,5 @@ flutter:
 
   assets:
     - assets/logo/
+    # Açılış animasyonundaki logo: şeffaf zeminli beyaz top.
+    - assets/icon/app_icon_foreground.png

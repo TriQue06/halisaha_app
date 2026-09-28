@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -9,28 +11,38 @@ import 'core/config/app_config.dart';
 import 'core/services/push_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_gate.dart';
+import 'features/splash/app_bootstrap.dart';
 import 'state/settings_controller.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Hazırlık (Supabase vb.) artık burada beklenmiyor: arayüz hemen açılır
+  // ve açılış animasyonu oynarken [_initializeServices] paralel çalışır.
+  runApp(const ProviderScope(child: JaponKaleApp()));
+}
 
+/// Uygulamanın kullanılabilmesi için gereken hazırlık.
+///
+/// [AppBootstrap] bunu açılış animasyonuyla aynı anda çalıştırır ve bitene
+/// kadar [AuthGate]'i göstermez; Supabase'e dokunan her şey bundan sonra.
+Future<void> _initializeServices() async {
   // Türkçe tarih/ay isimleri için yerelleştirme verisini yükle.
   await initializeDateFormatting('tr_TR');
 
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    publishableKey: AppConfig.supabasePublishableKey,
-  );
-
-  // Web sürümünde push bildirimi yok (web implementasyonu kurulu değil).
-  // Web, arkadaş testleri için hafif bir önizleme; bildirim mobil uygulamada.
-  if (!kIsWeb) {
-    // Push bildirimleri. Kendi içinde hata yakalıyor: Firebase kurulmamış bir
-    // ortamda bile uygulama normal açılmaya devam eder.
-    await PushService.initialize();
+  // Tekrar denemede ikinci kez başlatılmasın.
+  try {
+    Supabase.instance;
+  } catch (_) {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      publishableKey: AppConfig.supabasePublishableKey,
+    );
   }
 
-  runApp(const ProviderScope(child: JaponKaleApp()));
+  // Web sürümünde push bildirimi yok (web implementasyonu kurulu değil).
+  // Beklenmiyor: ilk açılıştaki bildirim izni sorusu cevaplanana kadar
+  // uygulama açılışta takılı kalmasın. Kendi içinde hataları yakalıyor.
+  if (!kIsWeb) unawaited(PushService.initialize());
 }
 
 class JaponKaleApp extends ConsumerWidget {
@@ -61,8 +73,12 @@ class JaponKaleApp extends ConsumerWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      // Oturum durumuna göre giriş / profil tamamlama / ana ekran.
-      home: const AuthGate(),
+      // Açılış animasyonu + hazırlık, ardından oturum durumuna göre
+      // giriş / profil tamamlama / ana ekran.
+      home: const AppBootstrap(
+        initialize: _initializeServices,
+        child: AuthGate(),
+      ),
     );
   }
 }

@@ -3,4 +3,7 @@
     <!-- Bildirim ikonunun tonu: uygulamanin koyu yesili -->
     <color name="notification_color">#0B5D2E</color>
 	<color name="ic_launcher_background">#0B6B3A</color>
+    <!-- Sistem acilis ekrani: uygulamanin yesili. Flutter'daki animasyonlu
+         acilis ekrani (AppBootstrap) ayni renkle basliyor, gecis gorunmuyor. -->
+    <color name="splash_background">#0B6B3A</color>
 </resources>
