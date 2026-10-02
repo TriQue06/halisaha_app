@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import '../../state/team_providers.dart';
+import '../teams/match_detail_screen.dart';
+import '../teams/team_form_screen.dart';
+import '../teams/team_profile_screen.dart';
+import '../teams/widgets/match_history_tile.dart';
 import '../auth/complete_profile_screen.dart';
 import 'goalkeeper_profile_editor.dart';
 import 'widgets/avatar_editor.dart';
@@ -343,7 +347,14 @@ class _MyTeamTab extends ConsumerWidget {
           for (final MatchHistoryEntry entry in history)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: _MatchHistoryTile(entry: entry),
+              child: MatchHistoryTile(
+                entry: entry,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MatchDetailScreen(matchId: entry.id),
+                  ),
+                ),
+              ),
             ),
       ],
       ),
@@ -351,20 +362,29 @@ class _MyTeamTab extends ConsumerWidget {
   }
 }
 
-/// Takımın G/B/M özeti.
-class _TeamSummaryCard extends StatelessWidget {
+/// Takımın G/B/M özeti; dokununca takım profili. Kadro eksikse uyarır.
+class _TeamSummaryCard extends ConsumerWidget {
   const _TeamSummaryCard({required this.team});
 
   final Team team;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
+    final List<TeamPlayer>? roster = ref.watch(teamRosterProvider(team.id)).valueOrNull;
 
     return Card(
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => TeamProfileScreen(teamId: team.id)),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+        Row(
           children: <Widget>[
             CircleAvatar(
               radius: 24,
@@ -403,84 +423,41 @@ class _TeamSummaryCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Maç geçmişi satırı — sonuç rozeti (G/B/M) ile.
-class _MatchHistoryTile extends StatelessWidget {
-  const _MatchHistoryTile({required this.entry});
-
-  final MatchHistoryEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    final (Color color, String label) = switch (entry.outcome) {
-      TeamOutcome.win => (AppColors.win, 'Galibiyet'),
-      TeamOutcome.draw => (AppColors.draw, 'Beraberlik'),
-      TeamOutcome.loss => (AppColors.loss, 'Mağlubiyet'),
-    };
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              ),
-              child: Text(
-                entry.outcome.shortLabel,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'vs ${entry.opponentName}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    entry.pitchName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color),
+            // Eski takımlarda kadro yok; teklif gönderip kabul etmek için şart.
+            if (roster != null && roster.length < kMinRosterSize) ...<Widget>[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                decoration: BoxDecoration(
+                  color: AppColors.loss.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  DateFormat('d MMM yyyy', 'tr_TR').format(entry.playedAt),
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                child: Row(
+                  children: <Widget>[
+                    const Icon(Icons.warning_amber_rounded, color: AppColors.loss, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kadronda ${roster.length} oyuncu var. Maç teklifi için '
+                        'en az $kMinRosterSize gerekli.',
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<bool>(
+                          builder: (_) =>
+                              TeamFormScreen.editRoster(team: team, players: roster),
+                        ),
+                      ),
+                      child: const Text('Kadro ekle'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ],
+        ),
         ),
       ),
     );

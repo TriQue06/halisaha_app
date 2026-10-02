@@ -12,10 +12,14 @@ class GoalkeeperCard extends StatelessWidget {
     super.key,
     required this.goalkeeper,
     required this.onContact,
+    this.menu,
   });
 
   final Goalkeeper goalkeeper;
   final VoidCallback onContact;
+
+  /// Sağ üstteki menü (rapor et / engelle).
+  final Widget? menu;
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +71,7 @@ class GoalkeeperCard extends StatelessWidget {
                 ),
                 if (goalkeeper.isAvailable)
                   const InfoPill(label: 'Müsait', icon: Icons.circle, color: Color(0xFF17A45C)),
+                if (menu != null) menu!,
               ],
             ),
             const SizedBox(height: 12),

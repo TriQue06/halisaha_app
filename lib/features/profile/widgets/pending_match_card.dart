@@ -7,8 +7,13 @@ import '../../../core/utils/match_errors.dart';
 import '../../../core/utils/phone_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common_widgets.dart';
+import '../../../data/moderation_repository.dart';
 import '../../../models/models.dart';
 import '../../../state/app_providers.dart';
+import '../../moderation/report_action_sheet.dart';
+import '../../teams/lineup_picker_screen.dart';
+import '../../teams/match_result_screen.dart';
+import '../../teams/widgets/team_size_picker.dart';
 
 /// "Bekleyen Maçlar" kartı — 4 aşamalı onay sisteminin tüm UI state'i.
 ///
@@ -77,6 +82,12 @@ class _CardHeader extends StatelessWidget {
             Expanded(child: _StageBadge(stage: match.stage)),
             if (match.isChallenger)
               const InfoPill(label: 'Teklifi siz gönderdiniz', icon: Icons.bolt_rounded),
+            ModerationMenuButton(
+              userId: match.opponentCaptainId,
+              displayName: match.opponentTeamName,
+              reportContext: ReportContext.match,
+              matchId: match.id,
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -378,19 +389,30 @@ class _StageActions extends ConsumerWidget {
                   'İki taraf da hazır. ${match.opponentTeamName} maç gün ve saatini girecek.',
                 );
         }
-        return Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Expanded(
-              child: _HintText(
-                'Maç ${DateFormat("d MMMM EEEE, HH:mm", "tr_TR").format(match.matchDate!)} '
-                'tarihinde ${match.pitchName} sahasında.',
-              ),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: _HintText(
+                    'Maç ${DateFormat("d MMMM EEEE, HH:mm", "tr_TR").format(match.matchDate!)} '
+                    'tarihinde ${match.pitchName} sahasında'
+                    '${match.teamSize == null ? '' : ' · ${match.teamSize}v${match.teamSize}'}.',
+                  ),
+                ),
+                if (match.isChallenger && match.canReschedule)
+                  TextButton(
+                    onPressed: () => _pickMatchDate(context, actions),
+                    child: const Text('Değiştir'),
+                  ),
+              ],
             ),
-            if (match.isChallenger && match.canReschedule)
-              TextButton(
-                onPressed: () => _pickMatchDate(context, actions),
-                child: const Text('Değiştir'),
-              ),
+            const SizedBox(height: 10),
+            _LineupBlock(
+              match: match,
+              onSetTeamSize: () => _pickTeamSizeOnly(context, actions),
+            ),
           ],
         );
 
@@ -398,47 +420,34 @@ class _StageActions extends ConsumerWidget {
       // AŞAMA 4 — Maç bitti: sonucu gir
       // -----------------------------------------------------------------
       case PendingMatchStage.awaitingResult:
-        if (!match.isChallenger) {
-          return _HintText(
-            'Maç tamamlandı. Sonucu ${match.opponentTeamName} girecek; '
-            'istatistikleriniz otomatik güncellenecek.',
-          );
-        }
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const _HintText('Maç nasıl sonlandı?'),
+            if (match.isChallenger) ...<Widget>[
+              const _HintText('Maç bitti. Skoru ve oyuncularınızın gol/asistlerini girin.'),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MatchResultScreen(
+                      matchId: match.id,
+                      myTeamId: match.myTeamId,
+                      withScore: true,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.scoreboard_outlined, size: 18),
+                label: const Text('Sonucu Gir'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              ),
+            ] else
+              _HintText(
+                'Maç tamamlandı. Skoru ${match.opponentTeamName} girecek; sonra '
+                'Maç Geçmişi\'nden kendi oyuncularınızın gol/asistlerini girebilirsiniz.',
+              ),
             const SizedBox(height: 10),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: _ResultButton(
-                    label: 'Kazandık',
-                    color: AppColors.win,
-                    icon: Icons.emoji_events_rounded,
-                    onPressed: () => _reportResult(context, actions, TeamOutcome.win),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _ResultButton(
-                    label: 'Berabere',
-                    color: AppColors.draw,
-                    icon: Icons.handshake_rounded,
-                    onPressed: () => _reportResult(context, actions, TeamOutcome.draw),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _ResultButton(
-                    label: 'Kaybettik',
-                    color: AppColors.loss,
-                    icon: Icons.trending_down_rounded,
-                    onPressed: () => _reportResult(context, actions, TeamOutcome.loss),
-                  ),
-                ),
-              ],
-            ),
+            // Maçtan önce unutulduysa kadro hâlâ seçilebilir.
+            _LineupBlock(match: match),
           ],
         );
 
@@ -579,26 +588,93 @@ class _StageActions extends ConsumerWidget {
       return;
     }
 
+    // Maç kilitleme: kaç kişilik olacağı gün/saatle birlikte kaydedilir.
+    final int? teamSize = await showTeamSizePicker(
+      context,
+      initial: match.teamSize,
+      hasLineup: match.myLineupCount > 0,
+    );
+    if (teamSize == null || !context.mounted) return;
+
     await _run(
       context,
-      () => actions.setMatchDate(match.id, picked),
-      successMessage: 'Maç tarihi kaydedildi.',
+      () => actions.setMatchDate(match.id, picked, teamSize: teamSize),
+      successMessage: 'Maç tarihi ve kişi sayısı kaydedildi.',
     );
   }
 
-  void _reportResult(
-    BuildContext context,
-    MatchActions actions,
-    TeamOutcome outcome,
-  ) async {
+  /// Eski maçlar: tarih belli ama kişi sayısı seçilmemiş.
+  Future<void> _pickTeamSizeOnly(BuildContext context, MatchActions actions) async {
+    final DateTime? date = match.matchDate;
+    if (date == null) return;
+    final int? teamSize = await showTeamSizePicker(context);
+    if (teamSize == null || !context.mounted) return;
     await _run(
       context,
-      () => actions.reportResult(match.id, outcome),
-      successMessage: switch (outcome) {
-        TeamOutcome.win => 'Galibiyet kaydedildi. Tebrikler!',
-        TeamOutcome.draw => 'Beraberlik kaydedildi.',
-        TeamOutcome.loss => 'Mağlubiyet kaydedildi.',
-      },
+      () => actions.setMatchDate(match.id, date, teamSize: teamSize),
+      successMessage: 'Maç ${teamSize}v$teamSize olarak kaydedildi.',
+    );
+  }
+}
+
+/// Maç kadrosu durumu: "Kadronuz 5/7" + Kadroyu Seç.
+class _LineupBlock extends StatelessWidget {
+  const _LineupBlock({required this.match, this.onSetTeamSize});
+
+  final PendingMatch match;
+
+  /// Kişi sayısı henüz seçilmemişse (eski maçlar) teklifi gönderen için.
+  final VoidCallback? onSetTeamSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final int? size = match.teamSize;
+
+    if (size == null) {
+      if (match.isChallenger && match.canReschedule && onSetTeamSize != null) {
+        return OutlinedButton.icon(
+          onPressed: onSetTeamSize,
+          icon: const Icon(Icons.groups_outlined, size: 18),
+          label: const Text('Maç kaç kişilik? Belirle'),
+        );
+      }
+      return const SizedBox.shrink();
+    }
+    if (!match.canPickLineup) return const SizedBox.shrink();
+
+    final bool complete = match.isLineupComplete;
+    final Color color = complete ? AppColors.win : AppColors.draw;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            complete ? Icons.check_circle_rounded : Icons.groups_outlined,
+            color: color,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              complete
+                  ? 'Maç kadronuz hazır (${size}v$size)'
+                  : 'Maç kadronuz: ${match.myLineupCount}/$size',
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => LineupPickerScreen(match: match)),
+            ),
+            child: Text(complete ? 'Düzenle' : 'Kadroyu Seç'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -697,47 +773,6 @@ class _ReadyChip extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResultButton extends StatelessWidget {
-  const _ResultButton({
-    required this.label,
-    required this.color,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final Color color;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.12),
-        foregroundColor: color,
-        elevation: 0,
-        minimumSize: const Size(0, 62),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
           ),
         ],
       ),

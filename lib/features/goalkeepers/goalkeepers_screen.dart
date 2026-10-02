@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/phone_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../data/moderation_repository.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
+import '../moderation/report_action_sheet.dart';
 import 'widgets/district_picker.dart';
 import 'widgets/goalkeeper_card.dart';
 
@@ -131,6 +133,11 @@ class GoalkeepersScreen extends ConsumerWidget {
                       return GoalkeeperCard(
                         goalkeeper: goalkeeper,
                         onContact: () => _showContactSheet(context, ref, goalkeeper),
+                        menu: ModerationMenuButton(
+                          userId: goalkeeper.id,
+                          displayName: goalkeeper.fullName,
+                          reportContext: ReportContext.goalkeeper,
+                        ),
                       );
                     },
                   );

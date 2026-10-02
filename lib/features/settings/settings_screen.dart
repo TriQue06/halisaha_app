@@ -8,6 +8,7 @@ import '../../core/utils/link_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/theme_selector.dart';
 import '../../state/auth_controller.dart';
+import '../moderation/blocked_users_screen.dart';
 import '../../state/settings_controller.dart';
 
 /// Ayarlar sekmesi: tema, yazı boyutu ve bildirim tercihleri.
@@ -105,6 +106,17 @@ class SettingsScreen extends ConsumerWidget {
           ),
           _SettingsGroup(
             children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.block_rounded),
+                title: const Text('Engellenen kullanıcılar'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const BlockedUsersScreen(),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
               ListTile(
                 leading: const Icon(
                   Icons.delete_forever_rounded,

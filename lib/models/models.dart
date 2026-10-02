@@ -284,13 +284,240 @@ class MatchHistoryEntry {
     required this.pitchName,
     required this.playedAt,
     required this.outcome,
+    this.opponentId = '',
+    this.teamScore,
+    this.opponentScore,
+    this.teamSize,
+    this.reportedAt,
   });
 
+  /// `get_team_match_history` RPC satırı.
+  factory MatchHistoryEntry.fromRow(Map<String, dynamic> row) {
+    DateTime? parse(String key) =>
+        DateTime.tryParse(row[key] as String? ?? '')?.toLocal();
+
+    return MatchHistoryEntry(
+      id: row['match_id'] as String,
+      opponentId: (row['opponent_id'] as String?) ?? '',
+      opponentName: (row['opponent_name'] as String?) ?? '—',
+      pitchName: (row['pitch_name'] as String?) ?? '—',
+      // Yerel saate çevrilmezse 00:00-03:00 (TR) arası maçlar bir
+      // önceki güne yazılıyordu; liste yalnızca gün gösteriyor.
+      playedAt: parse('played_at') ?? DateTime.now(),
+      outcome: switch (row['outcome'] as String?) {
+        'win' => TeamOutcome.win,
+        'loss' => TeamOutcome.loss,
+        _ => TeamOutcome.draw,
+      },
+      teamScore: (row['team_score'] as num?)?.toInt(),
+      opponentScore: (row['opponent_score'] as num?)?.toInt(),
+      teamSize: (row['team_size'] as num?)?.toInt(),
+      reportedAt: parse('reported_at'),
+    );
+  }
+
   final String id;
+  final String opponentId;
   final String opponentName;
   final String pitchName;
   final DateTime playedAt;
   final TeamOutcome outcome;
+
+  /// Skorlar eski maçlarda yok (yalnızca G/B/M girilmişti).
+  final int? teamScore;
+  final int? opponentScore;
+  final int? teamSize;
+  final DateTime? reportedAt;
+
+  /// "3 - 2"; skor girilmemişse null.
+  String? get scoreLabel =>
+      teamScore == null || opponentScore == null ? null : '$teamScore - $opponentScore';
+}
+
+// =====================================================================
+// KADRO, MAÇ KADROSU, İSTATİSTİK
+// =====================================================================
+
+/// Kadroda en az bu kadar oyuncu olmalı (veritabanı da denetliyor).
+const int kMinRosterSize = 7;
+
+/// Maç başına takım kişi sayısı aralığı (5v5 - 11v11).
+const int kMinTeamSize = 5;
+const int kMaxTeamSize = 11;
+
+/// Takımın kadro havuzundaki oyuncu ve toplam istatistikleri.
+@immutable
+class TeamPlayer {
+  const TeamPlayer({
+    required this.id,
+    required this.teamId,
+    required this.firstName,
+    required this.lastName,
+    this.appearances = 0,
+    this.goals = 0,
+    this.assists = 0,
+  });
+
+  /// `team_player_stats` view satırı.
+  factory TeamPlayer.fromRow(Map<String, dynamic> row) {
+    return TeamPlayer(
+      id: row['player_id'] as String,
+      teamId: (row['team_id'] as String?) ?? '',
+      firstName: (row['first_name'] as String?) ?? '',
+      lastName: (row['last_name'] as String?) ?? '',
+      appearances: (row['appearances'] as num?)?.toInt() ?? 0,
+      goals: (row['goals'] as num?)?.toInt() ?? 0,
+      assists: (row['assists'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  final String id;
+  final String teamId;
+  final String firstName;
+  final String lastName;
+  final int appearances;
+  final int goals;
+  final int assists;
+
+  String get fullName => '$firstName $lastName'.trim();
+}
+
+/// Kadro formundan gönderilen satır (id yoksa yeni oyuncu).
+@immutable
+class RosterEntry {
+  const RosterEntry({this.id, required this.firstName, required this.lastName});
+
+  final String? id;
+  final String firstName;
+  final String lastName;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'first_name': firstName.trim(),
+        'last_name': lastName.trim(),
+      };
+}
+
+/// Saha gol / asist krallığındaki bir satır.
+@immutable
+class LeaderboardEntry {
+  const LeaderboardEntry({
+    required this.playerId,
+    required this.name,
+    required this.teamId,
+    required this.teamName,
+    required this.appearances,
+    required this.goals,
+    required this.assists,
+  });
+
+  /// `pitch_player_stats` view satırı.
+  factory LeaderboardEntry.fromRow(Map<String, dynamic> row) {
+    return LeaderboardEntry(
+      playerId: row['player_id'] as String,
+      name: '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim(),
+      teamId: (row['team_id'] as String?) ?? '',
+      teamName: (row['team_name'] as String?) ?? '',
+      appearances: (row['appearances'] as num?)?.toInt() ?? 0,
+      goals: (row['goals'] as num?)?.toInt() ?? 0,
+      assists: (row['assists'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  final String playerId;
+  final String name;
+  final String teamId;
+  final String teamName;
+  final int appearances;
+  final int goals;
+  final int assists;
+}
+
+/// Maça çıkan bir oyuncu ve o maçtaki gol / asisti.
+@immutable
+class LineupPlayer {
+  const LineupPlayer({
+    required this.playerId,
+    required this.teamId,
+    required this.name,
+    required this.slot,
+    this.goals = 0,
+    this.assists = 0,
+  });
+
+  factory LineupPlayer.fromRow(Map<String, dynamic> row) {
+    return LineupPlayer(
+      playerId: (row['player_id'] as String?) ?? '',
+      teamId: (row['team_id'] as String?) ?? '',
+      name: '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim(),
+      slot: (row['slot'] as num?)?.toInt() ?? 0,
+      goals: (row['goals'] as num?)?.toInt() ?? 0,
+      assists: (row['assists'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  final String playerId;
+  final String teamId;
+  final String name;
+  final int slot;
+  final int goals;
+  final int assists;
+}
+
+/// Maç detayında bir takımın tarafı.
+@immutable
+class MatchSide {
+  const MatchSide({
+    required this.teamId,
+    required this.teamName,
+    required this.captainId,
+    required this.lineup,
+    this.score,
+  });
+
+  final String teamId;
+  final String teamName;
+  final String captainId;
+  final int? score;
+  final List<LineupPlayer> lineup;
+}
+
+/// Bir maçın skoru ve iki takımın kadrosu.
+@immutable
+class MatchDetail {
+  const MatchDetail({
+    required this.id,
+    required this.status,
+    required this.pitchName,
+    required this.challenger,
+    required this.opponent,
+    this.matchDate,
+    this.teamSize,
+    this.reportedAt,
+  });
+
+  final String id;
+  final MatchStatus status;
+  final String pitchName;
+  final MatchSide challenger;
+  final MatchSide opponent;
+  final DateTime? matchDate;
+  final int? teamSize;
+  final DateTime? reportedAt;
+
+  /// Gol/asist, maç bittikten sonraki 7 gün içinde girilebilir/düzeltilebilir.
+  bool get areStatsEditable =>
+      status == MatchStatus.completed &&
+      reportedAt != null &&
+      DateTime.now().isBefore(reportedAt!.add(const Duration(days: 7)));
+
+  /// [userId]'nin kaptanı olduğu taraf (yoksa null).
+  MatchSide? sideOf(String? userId) {
+    if (userId == null) return null;
+    if (challenger.captainId == userId) return challenger;
+    if (opponent.captainId == userId) return opponent;
+    return null;
+  }
 }
 
 /// "Bekleyen Maçlar" listesindeki bir kayıt.
@@ -304,6 +531,10 @@ class PendingMatch {
     required this.myTeamName,
     required this.opponentTeamName,
     this.opponentTeamId = '',
+    this.opponentCaptainId = '',
+    this.myTeamId = '',
+    this.teamSize,
+    this.myLineupCount = 0,
     required this.opponentPhone,
     required this.opponentCaptainName,
     required this.pitchName,
@@ -321,6 +552,24 @@ class PendingMatch {
 
   /// Saha detayında "bu takımla zaten maçım var mı" kontrolü için.
   final String opponentTeamId;
+
+  /// Rakip takımın kaptanı; maç kartından raporlama/engelleme için.
+  final String opponentCaptainId;
+
+  /// Bu maçtaki takımımız (kadro seçimi için).
+  final String myTeamId;
+
+  /// Maç kaç kişilik (5-11); gün/saatle birlikte belirlenir.
+  final int? teamSize;
+
+  /// Maç kadromuza seçtiğimiz oyuncu sayısı.
+  final int myLineupCount;
+
+  /// Kadro seçimi yapılabilir mi? (Gün ve kişi sayısı belli, sonuç girilmemiş.)
+  bool get canPickLineup => status == MatchStatus.scheduled && teamSize != null;
+
+  /// Kadro eksiksiz seçildi mi?
+  bool get isLineupComplete => teamSize != null && myLineupCount == teamSize;
 
   /// Yalnızca [PendingMatchStage.confirmed] ve sonrasında UI'da gösterilir.
   final String opponentPhone;
@@ -416,6 +665,11 @@ class PendingMatch {
       id: id,
       myTeamName: myTeamName,
       opponentTeamName: opponentTeamName,
+      opponentTeamId: opponentTeamId,
+      opponentCaptainId: opponentCaptainId,
+      myTeamId: myTeamId,
+      teamSize: teamSize,
+      myLineupCount: myLineupCount,
       opponentPhone: opponentPhone,
       opponentCaptainName: opponentCaptainName,
       pitchName: pitchName,

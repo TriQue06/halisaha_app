@@ -99,26 +99,6 @@ final ProviderFamily<Team?, String> myTeamForPitchProvider =
   return teams.where((Team t) => t.pitchId == pitchId).firstOrNull;
 });
 
-/// Takım oluşturma.
-final Provider<Future<Team> Function({
-  required String pitchId,
-  required String name,
-})> createTeamProvider = Provider((Ref ref) {
-  return ({
-    required String pitchId,
-    required String name,
-  }) async {
-    final Team team = await ref.read(repositoryProvider).createTeam(
-          pitchId: pitchId,
-          name: name,
-        );
-    ref.invalidate(myTeamsProvider);
-    ref.invalidate(teamsForPitchProvider(pitchId));
-    ref.invalidate(pitchesProvider); // takım sayısı değişti
-    return team;
-  };
-});
-
 /// Profildeki telefon numarasını günceller.
 ///
 /// Numara tek kaynaktan yönetiliyor: profil değişince takım ve kaleci
@@ -295,9 +275,10 @@ class MatchActions {
     _refresh();
   }
 
-  /// AŞAMA 3 — teklifi gönderen takım gün ve saati girer.
-  Future<void> setMatchDate(String matchId, DateTime date) async {
-    await _repo.scheduleMatch(matchId: matchId, date: date);
+  /// AŞAMA 3 — teklifi gönderen takım gün/saati ve kaç kişilik olacağını
+  /// girer (maç kilitleme).
+  Future<void> setMatchDate(String matchId, DateTime date, {int? teamSize}) async {
+    await _repo.scheduleMatch(matchId: matchId, date: date, teamSize: teamSize);
     _refresh();
   }
 

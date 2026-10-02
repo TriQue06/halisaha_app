@@ -5,9 +5,13 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/match_errors.dart';
 import '../../core/utils/phone_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../data/moderation_repository.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
-import '../profile/widgets/phone_editor.dart';
+import '../moderation/report_action_sheet.dart';
+import '../teams/team_form_screen.dart';
+import '../teams/team_profile_screen.dart';
+import '../teams/widgets/pitch_leaderboard.dart';
 
 /// Saha Detay Sayfası.
 ///
@@ -102,7 +106,11 @@ class PitchDetailScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: myTeam == null
                   ? FilledButton.icon(
-                      onPressed: () => _showCreateTeamSheet(context, ref, pitch),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => TeamFormScreen.create(pitch: pitch),
+                        ),
+                      ),
                       icon: const Icon(Icons.add_moderator_rounded),
                       label: const Text('Takımımı Bu Sahaya Kaydet'),
                       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
@@ -146,10 +154,25 @@ class PitchDetailScreen extends ConsumerWidget {
                     hasActiveMatch: busyOpponentIds.contains(team.id),
                     isMyTeam: myTeam?.id == team.id,
                     onChallenge: () => _sendChallenge(context, ref, myTeam!, team, pitch),
+                    onOpen: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TeamProfileScreen(teamId: team.id),
+                      ),
+                    ),
                   ),
                 );
               },
             ),
+
+          // --- Gol / asist krallığı -------------------------------------
+          const SliverToBoxAdapter(
+            child: SectionHeader(
+              title: 'Krallık Yarışı',
+              subtitle: 'Bu sahanın en golcü ve en çok asist yapan oyuncuları',
+              icon: Icons.emoji_events_rounded,
+            ),
+          ),
+          SliverToBoxAdapter(child: PitchLeaderboard(pitchId: pitchId)),
           const SliverToBoxAdapter(child: SizedBox(height: 28)),
         ],
       ),
@@ -204,14 +227,6 @@ class PitchDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _showCreateTeamSheet(BuildContext context, WidgetRef ref, Pitch pitch) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext sheetContext) => _CreateTeamSheet(pitch: pitch),
     );
   }
 }
@@ -292,6 +307,7 @@ class _TeamRow extends StatelessWidget {
     required this.hasActiveMatch,
     required this.isMyTeam,
     required this.onChallenge,
+    required this.onOpen,
   });
 
   final Team team;
@@ -305,13 +321,19 @@ class _TeamRow extends StatelessWidget {
   final bool isMyTeam;
   final VoidCallback onChallenge;
 
+  /// Takım profiline (kadro + maç geçmişi) gider.
+  final VoidCallback onOpen;
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
 
     return Card(
       color: isMyTeam ? theme.colorScheme.primary.withValues(alpha: 0.06) : null,
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: <Widget>[
@@ -352,25 +374,30 @@ class _TeamRow extends StatelessWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${team.played} maç · ${team.points} puan',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 4),
+                  // G/B/M isim altında: sağda maç teklifi ve menüye
+                  // yer kalsın diye.
+                  Row(
+                    children: <Widget>[
+                      StatBadge.win(value: team.wins),
+                      const SizedBox(width: 4),
+                      StatBadge.draw(value: team.draws),
+                      const SizedBox(width: 4),
+                      StatBadge.loss(value: team.losses),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '${team.points} puan',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                StatBadge.win(value: team.wins),
-                const SizedBox(width: 4),
-                StatBadge.draw(value: team.draws),
-                const SizedBox(width: 4),
-                StatBadge.loss(value: team.losses),
-              ],
             ),
             // ---------------------------------------------------------
             // MAÇ TEKLİFİ — yalnızca kullanıcının bu sahada takımı varsa.
@@ -391,8 +418,16 @@ class _TeamRow extends StatelessWidget {
                 child: Text(hasActiveMatch ? 'MAÇ VAR' : 'MAÇ TEKLİFİ'),
               ),
             ],
+            // Rapor et / engelle: takım kaptanı hakkında.
+            if (!isMyTeam)
+              ModerationMenuButton(
+                userId: team.captainId,
+                displayName: team.name,
+                reportContext: ReportContext.team,
+              ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -438,111 +473,6 @@ class _MyTeamBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// =====================================================================
-// Takım oluşturma formu (BottomSheet)
-// =====================================================================
-class _CreateTeamSheet extends ConsumerStatefulWidget {
-  const _CreateTeamSheet({required this.pitch});
-
-  final Pitch pitch;
-
-  @override
-  ConsumerState<_CreateTeamSheet> createState() => _CreateTeamSheetState();
-}
-
-class _CreateTeamSheetState extends ConsumerState<_CreateTeamSheet> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final NavigatorState navigator = Navigator.of(context);
-
-    try {
-      await ref.read(createTeamProvider)(
-        pitchId: widget.pitch.id,
-        name: _nameController.text.trim(),
-      );
-      navigator.pop();
-      messenger.showSnackBar(
-        SnackBar(content: Text('${widget.pitch.name} sahasına takımın kaydedildi.')),
-      );
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Takım oluşturulamadı: $error')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    // Numara olmadan takım kurulamaz (veritabanı da reddediyor).
-    final bool hasPhone = (ref.watch(currentUserProvider)?.phone ?? '').isNotEmpty;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        8,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Takımını Oluştur',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.pitch.name,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 18),
-            TextFormField(
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Takım Adı',
-                hintText: 'Örn. Bornova Kartalları',
-                prefixIcon: Icon(Icons.shield_outlined),
-              ),
-              validator: (String? value) {
-                if (value == null || value.trim().length < 3) {
-                  return 'Takım adı en az 3 karakter olmalı.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            // Numara elle girilmiyor: profildeki numara kullanılır.
-            const ContactPhoneNotice(label: 'Takım iletişim numarası'),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: hasPhone ? _submit : null,
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-              child: const Text('Takımı Kaydet'),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -39,9 +39,56 @@ class AuthGate extends ConsumerWidget {
       data: (Map<String, dynamic>? data) {
         // Trigger profili henüz oluşturmadıysa kısa bir yarış olabilir;
         // eksik profil ekranı zaten bu durumu da karşılıyor.
+        // Panelden banlanan hesap: uygulama kullanılamaz.
+        if (data?['is_banned'] == true) {
+          return _BannedScreen(
+            onSignOut: () => ref.read(authControllerProvider).signOut(),
+          );
+        }
         if (!isProfileComplete(data)) return const CompleteProfileScreen();
         return const MainShell();
       },
+    );
+  }
+}
+
+/// Topluluk kurallarını ihlal ettiği için askıya alınan hesap.
+class _BannedScreen extends StatelessWidget {
+  const _BannedScreen({required this.onSignOut});
+
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(Icons.gpp_bad_outlined, size: 48, color: theme.colorScheme.error),
+              const SizedBox(height: 14),
+              Text(
+                'Hesabın askıya alındı',
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Topluluk kurallarını ihlal ettiği için hesabın kullanıma '
+                'kapatıldı. İtiraz için omersarikan35@gmail.com adresine yazabilirsin.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: onSignOut, child: const Text('Çıkış Yap')),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

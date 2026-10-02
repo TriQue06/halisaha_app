@@ -204,14 +204,17 @@ class SupabaseRepository {
   // TAKIMLAR
   // -------------------------------------------------------------------
 
+  /// Sahadaki takımlar. `teams_with_stats` view'ından okunuyor: view,
+  /// engellenen ve banlanan kullanıcıların takımlarını veritabanında
+  /// eliyor (`is_hidden_from_me`).
   Future<List<Team>> fetchTeamsForPitch(String pitchId) async {
     final List<Map<String, dynamic>> rows = await _client
-        .from('teams')
+        .from('teams_with_stats')
         .select()
         .eq('pitch_id', pitchId)
         .eq('is_active', true);
 
-    final List<Team> teams = rows.map(_teamFromRow).toList()
+    final List<Team> teams = rows.map(teamFromRow).toList()
       ..sort((Team a, Team b) => b.points.compareTo(a.points));
     return teams;
   }
@@ -223,33 +226,7 @@ class SupabaseRepository {
     final List<Map<String, dynamic>> rows =
         await _client.from('teams').select().eq('captain_id', uid);
 
-    return rows.map(_teamFromRow).toList(growable: false);
-  }
-
-  /// Takım kurar. İletişim numarası gönderilmez; trigger profildeki
-  /// numarayı yazar.
-  Future<Team> createTeam({
-    required String pitchId,
-    required String name,
-  }) async {
-    final String? uid = _client.auth.currentUser?.id;
-    if (uid == null) {
-      throw StateError('Takım kurmak için oturum gerekli.');
-    }
-
-    final Map<String, dynamic> row = await _client
-        .from('teams')
-        .insert(<String, dynamic>{
-          'pitch_id': pitchId,
-          'captain_id': uid,
-          'name': name,
-          // contact_phone yazılmıyor; trigger profilden dolduruyor.
-          'contact_phone': '',
-        })
-        .select()
-        .single();
-
-    return _teamFromRow(row);
+    return rows.map(teamFromRow).toList(growable: false);
   }
 
   // -------------------------------------------------------------------
@@ -262,13 +239,14 @@ class SupabaseRepository {
   /// söyler; `matches` tablosunda `teams`'e iki ayrı FK olduğu için bu şart.
   static const String _matchSelect = '''
     id, status, responded_at, challenger_confirmed_at, opponent_confirmed_at,
-    match_date, challenger_team_id, opponent_team_id,
+    match_date, challenger_team_id, opponent_team_id, team_size,
+    lineups:match_lineups(team_id),
     challenger:teams!matches_challenger_team_id_fkey(
-      id, name, contact_phone,
+      id, name, contact_phone, captain_id,
       captain:profiles!teams_captain_id_fkey(first_name, last_name)
     ),
     opponent:teams!matches_opponent_team_id_fkey(
-      id, name, contact_phone,
+      id, name, contact_phone, captain_id,
       captain:profiles!teams_captain_id_fkey(first_name, last_name)
     ),
     pitch:pitches(name)
@@ -310,23 +288,7 @@ class SupabaseRepository {
       );
 
       for (final dynamic raw in rows) {
-        final Map<String, dynamic> row = raw as Map<String, dynamic>;
-        all.add(
-          MatchHistoryEntry(
-            id: row['match_id'] as String,
-            opponentName: (row['opponent_name'] as String?) ?? '—',
-            pitchName: (row['pitch_name'] as String?) ?? '—',
-            // Yerel saate çevrilmezse 00:00-03:00 (TR) arası maçlar bir
-            // önceki güne yazılıyordu; liste yalnızca gün gösteriyor.
-            playedAt: DateTime.tryParse(row['played_at'] as String? ?? '')?.toLocal() ??
-                DateTime.now(),
-            outcome: switch (row['outcome'] as String?) {
-              'win' => TeamOutcome.win,
-              'loss' => TeamOutcome.loss,
-              _ => TeamOutcome.draw,
-            },
-          ),
-        );
+        all.add(MatchHistoryEntry.fromRow(raw as Map<String, dynamic>));
       }
     }
 
@@ -362,11 +324,17 @@ class SupabaseRepository {
     });
   }
 
-  /// Maç gün ve saatini kaydeder (yalnızca teklifi gönderen takım).
-  Future<void> scheduleMatch({required String matchId, required DateTime date}) {
+  /// Maç gün/saatini ve kaç kişilik olacağını kaydeder (yalnızca teklifi
+  /// gönderen takım). Kişi sayısı değişirse seçilmiş kadrolar sıfırlanır.
+  Future<void> scheduleMatch({
+    required String matchId,
+    required DateTime date,
+    int? teamSize,
+  }) {
     return _client.rpc<dynamic>('schedule_match', params: <String, dynamic>{
       'p_match_id': matchId,
       'p_match_date': date.toUtc().toIso8601String(),
+      'p_team_size': teamSize,
     });
   }
 
@@ -454,14 +422,26 @@ class SupabaseRepository {
       return value == null ? null : DateTime.tryParse(value)?.toLocal();
     }
 
+    final String myTeamId = (isChallenger
+            ? row['challenger_team_id']
+            : row['opponent_team_id']) as String? ??
+        '';
+    final int myLineupCount = ((row['lineups'] as List<dynamic>?) ?? <dynamic>[])
+        .where((dynamic l) => (l as Map<String, dynamic>)['team_id'] == myTeamId)
+        .length;
+
     return PendingMatch(
       id: row['id'] as String,
+      myTeamId: myTeamId,
+      teamSize: (row['team_size'] as num?)?.toInt(),
+      myLineupCount: myLineupCount,
       myTeamName: (mine?['name'] as String?) ?? 'Takımım',
       opponentTeamName: (other?['name'] as String?) ?? 'Rakip',
       opponentTeamId: (isChallenger
               ? row['opponent_team_id']
               : row['challenger_team_id']) as String? ??
           '',
+      opponentCaptainId: (other?['captain_id'] as String?) ?? '',
       opponentPhone: (other?['contact_phone'] as String?) ?? '',
       opponentCaptainName: captainName.isEmpty ? 'Takım kaptanı' : captainName,
       pitchName: ((row['pitch'] as Map<String, dynamic>?)?['name'] as String?) ?? '—',
@@ -488,7 +468,7 @@ class SupabaseRepository {
     );
   }
 
-  static Team _teamFromRow(Map<String, dynamic> row) {
+  static Team teamFromRow(Map<String, dynamic> row) {
     return Team(
       id: row['id'] as String,
       pitchId: row['pitch_id'] as String,
