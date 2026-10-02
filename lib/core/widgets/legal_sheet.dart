@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -26,6 +27,8 @@ Future<void> showLegalSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    // Sayfa sürüklenince kapanmasın: dikey kaydırma WebView'a gitsin.
+    enableDrag: false,
     builder: (BuildContext sheetContext) => _LegalSheet(title: title, url: url),
   );
 }
@@ -72,12 +75,12 @@ class _LegalSheetState extends State<_LegalSheet> {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.9,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (BuildContext context, ScrollController scrollController) {
+    // Sabit yükseklik: DraggableScrollableSheet dikey sürüklemeyi kendisi
+    // yakalıyordu, dokunmatikte sayfa aşağı kaydırılamıyordu.
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.9,
+      child: Builder(
+      builder: (BuildContext context) {
         return Column(
           children: <Widget>[
             Padding(
@@ -108,7 +111,15 @@ class _LegalSheetState extends State<_LegalSheet> {
                     )
                   : Stack(
                       children: <Widget>[
-                        WebViewWidget(controller: _controller),
+                        WebViewWidget(
+                          controller: _controller,
+                          // Tüm dokunmatik hareketleri WebView alsın.
+                          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                            Factory<OneSequenceGestureRecognizer>(
+                              () => EagerGestureRecognizer(),
+                            ),
+                          },
+                        ),
                         if (_isLoading)
                           const Center(child: CircularProgressIndicator()),
                       ],
@@ -117,6 +128,7 @@ class _LegalSheetState extends State<_LegalSheet> {
           ],
         );
       },
+      ),
     );
   }
 }
