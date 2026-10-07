@@ -133,8 +133,10 @@ class _AuthError extends StatelessWidget {
                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
+              // Ham hata metni (İngilizce, teknik) kullanıcıya gösterilmez.
               Text(
-                message,
+                'Sunucuya şu an ulaşılamıyor. İnternet bağlantını kontrol '
+                'edip tekrar dene.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),

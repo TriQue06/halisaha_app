@@ -39,12 +39,59 @@ final FutureProvider<Map<String, dynamic>?> myProfileProvider =
   if (session == null) return null;
 
   final SupabaseClient client = ref.watch(supabaseProvider);
-  return client
-      .from('profiles')
-      .select()
-      .eq('id', session.user.id)
-      .maybeSingle();
+  return loadOrCreateProfile(client, session.user);
 });
+
+/// Profili okur; giriş sonrası hata ekranı çıkmaması için dayanıklı.
+///
+/// App Store incelemesi "giriş yaptıktan sonra hata mesajı çıkıyor"
+/// gerekçesiyle reddetti (Guideline 2.1). Bu yüzden:
+///  * geçici ağ/sunucu hatalarında birkaç kez yeniden denenir,
+///  * satır yoksa (trigger gecikti ya da çalışmadı) kısa bir süre beklenir,
+///    hâlâ yoksa satır istemciden oluşturulur (RLS: kişi yalnızca kendi
+///    satırını ekleyebilir).
+Future<Map<String, dynamic>?> loadOrCreateProfile(
+  SupabaseClient client,
+  User user, {
+  int attempts = 3,
+  Duration delay = const Duration(milliseconds: 800),
+}) async {
+  Object? lastError;
+  for (int i = 0; i < attempts; i++) {
+    if (i > 0) await Future<void>.delayed(delay * i);
+    try {
+      final Map<String, dynamic>? row =
+          await client.from('profiles').select().eq('id', user.id).maybeSingle();
+      if (row != null) return row;
+      lastError = null;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  // Satır gerçekten yok: kendimiz oluşturalım. Ad-soyad varsa giriş
+  // sağlayıcısının verdiği bilgiden (Apple/Google/e-posta kaydı) alınır.
+  if (lastError == null) {
+    final Map<String, dynamic> meta = user.userMetadata ?? <String, dynamic>{};
+    final List<String> fullName =
+        ((meta['full_name'] ?? meta['name'] ?? '') as String).trim().split(RegExp(r'\s+'));
+    final String first =
+        ((meta['first_name'] ?? meta['given_name']) as String?)?.trim() ?? fullName.first;
+    final String last = ((meta['last_name'] ?? meta['family_name']) as String?)?.trim() ??
+        (fullName.length > 1 ? fullName.sublist(1).join(' ') : '');
+    try {
+      await client.from('profiles').upsert(
+        <String, dynamic>{'id': user.id, 'first_name': first, 'last_name': last},
+        onConflict: 'id',
+        ignoreDuplicates: true,
+      );
+      return await client.from('profiles').select().eq('id', user.id).maybeSingle();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
 
 /// Profil, uygulamayı kullanmaya yetecek kadar dolu mu?
 ///
