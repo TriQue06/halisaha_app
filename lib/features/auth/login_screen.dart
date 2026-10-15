@@ -6,6 +6,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../core/widgets/legal_consent.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/theme/app_theme.dart';
 import '../../state/auth_controller.dart';
 import 'reset_password_screen.dart';
 import 'signup_screen.dart';
@@ -190,22 +191,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // Apple ile Giriş yalnızca iOS'ta; App Store kuralı 4.8 gereği
                 // Google'dan önce ve aynı boyutta.
                 if (AppConfig.isIos) ...<Widget>[
+                  // Resmi buton; Google ve "Giriş Yap" ile aynı genişlik
+                  // (tam satır), yükseklik (50) ve köşe yuvarlaklığı.
+                  // Pasifken Google gibi soluklaşır; yüklenirken boyutu
+                  // korunur (App Store kuralı 4.8: eşdeğer giriş seçeneği).
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: SizedBox(
                       height: 50,
-                      child: _isAppleBusy
-                          ? const Center(child: CircularProgressIndicator())
-                          : SignInWithAppleButton(
-                              text: 'Apple ile devam et',
-                              style: Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? SignInWithAppleButtonStyle.white
-                                  : SignInWithAppleButtonStyle.black,
-                              onPressed: _isBusy || _isGoogleBusy || !_acceptedTerms
-                                  ? () {}
-                                  : _signInWithApple,
+                      child: Builder(builder: (BuildContext context) {
+                        final bool disabled =
+                            _isBusy || _isGoogleBusy || _isAppleBusy || !_acceptedTerms;
+                        final bool isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: <Widget>[
+                            AbsorbPointer(
+                              absorbing: disabled,
+                              child: Opacity(
+                                opacity: disabled && !_isAppleBusy ? 0.45 : 1,
+                                child: SignInWithAppleButton(
+                                  text: 'Apple ile devam et',
+                                  height: 50,
+                                  borderRadius: const BorderRadius.all(
+                                    Radius.circular(AppTheme.radiusMd),
+                                  ),
+                                  style: isDark
+                                      ? SignInWithAppleButtonStyle.white
+                                      : SignInWithAppleButtonStyle.black,
+                                  onPressed: _signInWithApple,
+                                ),
+                              ),
                             ),
+                            // Yüklenirken yazının üstünü aynı renkle örtüp
+                            // ortada gösterge.
+                            if (_isAppleBusy)
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white : Colors.black,
+                                  borderRadius:
+                                      BorderRadius.circular(AppTheme.radiusMd),
+                                ),
+                                child: Center(
+                                  child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: isDark ? Colors.black : Colors.white,
+                                  ),
+                                ),
+                                ),
+                              ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
                   const SizedBox(height: 12),
