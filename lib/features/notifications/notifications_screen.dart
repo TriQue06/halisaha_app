@@ -196,7 +196,7 @@ class _NotificationTile extends ConsumerWidget {
 
     // Maçla ilgili bildirimlerde aksiyon "Profilim → Takımım"da alınır.
     if (notification.kind.opensMyTeam) {
-      ref.read(selectedTabProvider.notifier).state = MainTab.profile.index;
+      ref.read(selectedTabProvider.notifier).state = MainTab.matches.index;
       if (navigator.canPop()) navigator.pop();
     }
   }

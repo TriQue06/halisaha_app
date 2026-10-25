@@ -39,60 +39,36 @@ final FutureProvider<Map<String, dynamic>?> myProfileProvider =
   if (session == null) return null;
 
   final SupabaseClient client = ref.watch(supabaseProvider);
-  return loadOrCreateProfile(client, session.user);
+  return loadMyProfile(client);
 });
 
-/// Profili okur; giriş sonrası hata ekranı çıkmaması için dayanıklı.
+/// Kendi profil satırını `get_my_profile()` RPC'siyle okur.
 ///
-/// App Store incelemesi "giriş yaptıktan sonra hata mesajı çıkıyor"
-/// gerekçesiyle reddetti (Guideline 2.1). Bu yüzden:
-///  * geçici ağ/sunucu hatalarında birkaç kez yeniden denenir,
-///  * satır yoksa (trigger gecikti ya da çalışmadı) kısa bir süre beklenir,
-///    hâlâ yoksa satır istemciden oluşturulur (RLS: kişi yalnızca kendi
-///    satırını ekleyebilir).
-Future<Map<String, dynamic>?> loadOrCreateProfile(
-  SupabaseClient client,
-  User user, {
+/// Telefon ve doğum tarihi başka kullanıcılara kapalı olduğu için profil
+/// tablosundan `select *` yapılamıyor; sahibine bu RPC döndürüyor. Satır
+/// yoksa (kayıt trigger'ı gecikti ya da çalışmadı) sunucu onu giriş
+/// sağlayıcısının verdiği adla oluşturuyor.
+///
+/// App Store "girişten sonra hata mesajı çıkıyor" diye reddetmişti (2.1):
+/// geçici ağ hatalarında birkaç kez yeniden deneniyor.
+Future<Map<String, dynamic>?> loadMyProfile(
+  SupabaseClient client, {
   int attempts = 3,
   Duration delay = const Duration(milliseconds: 800),
 }) async {
-  Object? lastError;
+  Object error = StateError('Profil alınamadı');
   for (int i = 0; i < attempts; i++) {
     if (i > 0) await Future<void>.delayed(delay * i);
     try {
-      final Map<String, dynamic>? row =
-          await client.from('profiles').select().eq('id', user.id).maybeSingle();
-      if (row != null) return row;
-      lastError = null;
-    } catch (error) {
-      lastError = error;
+      final dynamic row = await client.rpc<dynamic>('get_my_profile');
+      if (row is Map<String, dynamic> && row['id'] != null) return row;
+      if (row is List && row.isNotEmpty) return row.first as Map<String, dynamic>;
+    } catch (e) {
+      error = e;
     }
   }
-
-  // Satır gerçekten yok: kendimiz oluşturalım. Ad-soyad varsa giriş
-  // sağlayıcısının verdiği bilgiden (Apple/Google/e-posta kaydı) alınır.
-  if (lastError == null) {
-    final Map<String, dynamic> meta = user.userMetadata ?? <String, dynamic>{};
-    final List<String> fullName =
-        ((meta['full_name'] ?? meta['name'] ?? '') as String).trim().split(RegExp(r'\s+'));
-    final String first =
-        ((meta['first_name'] ?? meta['given_name']) as String?)?.trim() ?? fullName.first;
-    final String last = ((meta['last_name'] ?? meta['family_name']) as String?)?.trim() ??
-        (fullName.length > 1 ? fullName.sublist(1).join(' ') : '');
-    try {
-      await client.from('profiles').upsert(
-        <String, dynamic>{'id': user.id, 'first_name': first, 'last_name': last},
-        onConflict: 'id',
-        ignoreDuplicates: true,
-      );
-      return await client.from('profiles').select().eq('id', user.id).maybeSingle();
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError;
+  throw error;
 }
-
 /// Profil, uygulamayı kullanmaya yetecek kadar dolu mu?
 ///
 /// **Yalnızca ad ve soyad.** Doğum tarihi bilerek aranmıyor: Apple ile
@@ -127,14 +103,15 @@ class AuthController {
   // E-POSTA + ŞİFRE
   // -------------------------------------------------------------------
 
-  /// Kayıt. Ad, soyad, doğum tarihi ve telefon metadata olarak gönderilir;
-  /// trigger bunları doğrudan `profiles` tablosuna yazar.
+  /// Kayıt. Ad, soyad ve (verildiyse) doğum tarihi metadata olarak
+  /// gönderilir; trigger bunları doğrudan `profiles` tablosuna yazar.
+  /// Doğum tarihi isteğe bağlı: yalnızca kaleci kartında yaş için.
   Future<AuthResponse> signUpWithEmail({
     required String email,
     required String password,
     required String firstName,
     required String lastName,
-    required DateTime birthDate,
+    DateTime? birthDate,
   }) {
     return _auth.signUp(
       email: email.trim(),
@@ -142,7 +119,7 @@ class AuthController {
       data: <String, dynamic>{
         'first_name': firstName.trim(),
         'last_name': lastName.trim(),
-        'birth_date': _isoDate(birthDate),
+        if (birthDate != null) 'birth_date': _isoDate(birthDate),
       },
     );
   }
@@ -340,15 +317,27 @@ class AuthController {
   }
 
   /// Hesap Apple ile bağlıysa Apple'daki yetkiyi iptal eder (App Store
-  /// zorunluluğu). Hata hesap silmeyi durdurmaz.
+  /// zorunluluğu). Geçici hatalarda üç kez denenir; yine olmazsa hesap
+  /// silme durdurulmaz (silme hakkı engellenemez).
   Future<void> _revokeAppleIfLinked() async {
     final Object? providers = _auth.currentUser?.appMetadata['providers'];
     if (providers is! List || !providers.contains('apple')) return;
-    try {
+    await _retry('Apple yetkisi iptal edilemedi', () async {
       await _client.functions
           .invoke('apple-auth', body: <String, dynamic>{'action': 'revoke'});
-    } catch (error) {
-      debugPrint('Apple yetkisi iptal edilemedi: $error');
+    });
+  }
+
+  /// Hesap silmedeki temizlik adımları için kısa aralıklı yeniden deneme.
+  static Future<void> _retry(String label, Future<void> Function() action) async {
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await action();
+        return;
+      } catch (error) {
+        debugPrint('$label (deneme $attempt): $error');
+        if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 600 * attempt));
+      }
     }
   }
 
@@ -391,20 +380,19 @@ class AuthController {
 
   /// Kullanıcının profil fotoğrafı klasörünü boşaltır.
   ///
-  /// Hata hesap silmeyi durdurmaz: Play şartı silmenin engellenmemesi.
-  /// Kalan dosya hiçbir profile bağlı olmaz.
+  /// Geçici hatalarda üç kez denenir. Yine de başarısız olursa hesap
+  /// silme durdurulmaz (Play ve App Store silmenin engellenmemesini
+  /// istiyor); kalan dosya hiçbir profile bağlı olmaz.
   Future<void> _removeOwnAvatarFiles() async {
     final String? uid = _auth.currentUser?.id;
     if (uid == null) return;
-    try {
+    await _retry('Profil fotoğrafı silinemedi', () async {
       final StorageFileApi bucket = _client.storage.from(kAvatarBucket);
       final List<FileObject> files = await bucket.list(path: uid);
       if (files.isEmpty) return;
       await bucket.remove(
           <String>[for (final FileObject file in files) '$uid/${file.name}']);
-    } catch (_) {
-      // yoksayılır, bkz. yukarıdaki açıklama
-    }
+    });
   }
 
   /// Google veya telefonla girenlerin eksik profilini tamamlar.

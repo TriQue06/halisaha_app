@@ -37,6 +37,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Sosyal giriş hesabı da açtığı için koşul onayı burada da gerekiyor
   /// (App Store: hesap açılan her ekranda koşullara erişim + onay).
   bool _acceptedTerms = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Koşulları bu cihazda daha önce kabul eden kullanıcıya kutu tekrar
+    // boş gösterilmez.
+    TermsAcceptance.isAccepted().then((bool accepted) {
+      if (accepted && mounted) setState(() => _acceptedTerms = true);
+    });
+  }
   String? _error;
 
   @override

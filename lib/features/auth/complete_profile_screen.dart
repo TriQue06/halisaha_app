@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/izmir_districts.dart';
 import '../../state/auth_controller.dart';
+import '../settings/delete_account_dialog.dart';
 import 'widgets/auth_widgets.dart';
 
 /// Eksik profil bilgilerini tamamlama ekranı.
@@ -70,7 +71,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       context: context,
       initialDate: _birthDate ?? DateTime(now.year - 25, now.month, now.day),
       firstDate: DateTime(now.year - 90),
-      lastDate: DateTime(now.year - 13, now.month, now.day),
+      // Kullanım koşullarıyla aynı kural: 18 yaş ve üzeri.
+      lastDate: DateTime(now.year - 18, now.month, now.day),
       locale: const Locale('tr', 'TR'),
       helpText: 'Doğum tarihini seç',
     );
@@ -309,7 +311,17 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                             )
                           : const Text('Devam Et'),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 8),
+                    // Hesap silme her durumda erişilebilir olmalı
+                    // (App Store 5.1.1(v)); bu ekranda Ayarlar'a ulaşılamıyor.
+                    TextButton(
+                      onPressed: _isBusy ? null : () => showDeleteAccountDialog(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      child: const Text('Hesabımı sil'),
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),

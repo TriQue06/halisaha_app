@@ -7,17 +7,18 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
 import '../../state/team_providers.dart';
-import '../teams/match_detail_screen.dart';
+import '../../core/utils/match_errors.dart';
+import '../auth/complete_profile_screen.dart';
+import '../settings/settings_screen.dart';
+import '../shell/main_shell.dart';
 import '../teams/team_form_screen.dart';
 import '../teams/team_profile_screen.dart';
-import '../teams/widgets/match_history_tile.dart';
-import '../auth/complete_profile_screen.dart';
 import 'goalkeeper_profile_editor.dart';
 import 'widgets/avatar_editor.dart';
 import 'widgets/phone_editor.dart';
-import 'widgets/pending_match_card.dart';
 
-/// Profilim sekmesi: kullanıcı bilgileri + "Takımım" / "Kaleci Profilim" tabları.
+/// Profil sekmesi: kullanıcı bilgileri + "Takımlarım" / "Kaleci Profilim"
+/// tabları. Maçlar ayrı sekmede; ayarlar sağ üstteki dişliden açılır.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -34,13 +35,22 @@ class ProfileScreen extends ConsumerWidget {
               SliverAppBar(
                 pinned: true,
                 expandedHeight: 168,
+                actions: <Widget>[
+                  IconButton(
+                    tooltip: 'Ayarlar',
+                    icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+                    ),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: _ProfileHeader(user: user),
                   collapseMode: CollapseMode.pin,
                 ),
                 bottom: const TabBar(
                   tabs: <Widget>[
-                    Tab(text: 'Takımım'),
+                    Tab(text: 'Takımlarım'),
                     Tab(text: 'Kaleci Profilim'),
                   ],
                 ),
@@ -56,7 +66,7 @@ class ProfileScreen extends ConsumerWidget {
               const Expanded(
                 child: TabBarView(
                   children: <Widget>[
-                    _MyTeamTab(),
+                    _MyTeamsTab(),
                     GoalkeeperProfileEditor(embedded: true),
                   ],
                 ),
@@ -268,95 +278,72 @@ class _HeaderInfoRow extends StatelessWidget {
 }
 
 // =====================================================================
-// "Takımım" sekmesi: takım kartı + bekleyen maçlar + maç geçmişi
+// "Takımlarım" sekmesi
 // =====================================================================
-class _MyTeamTab extends ConsumerWidget {
-  const _MyTeamTab();
+class _MyTeamsTab extends ConsumerWidget {
+  const _MyTeamsTab();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<Team> myTeams = ref.watch(myTeamsProvider).valueOrNull ?? const <Team>[];
-    final List<PendingMatch> pending =
-        ref.watch(pendingMatchesProvider).valueOrNull ?? const <PendingMatch>[];
-    final List<MatchHistoryEntry> history =
-        ref.watch(matchHistoryProvider).valueOrNull ?? const <MatchHistoryEntry>[];
+    final AsyncValue<List<Team>> teamsAsync = ref.watch(myTeamsProvider);
 
-    if (myTeams.isEmpty) {
-      return const EmptyState(
-        icon: Icons.shield_outlined,
-        title: 'Henüz bir takımın yok',
-        message: 'Sahalar sekmesinden bir halı saha seçip takımını oluşturabilirsin.',
+    if (teamsAsync.isLoading && !teamsAsync.hasValue) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (teamsAsync.hasError && !teamsAsync.hasValue) {
+      // Bağlantı hatası "takımın yok" gibi gösterilmez.
+      return Center(
+        child: EmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: 'Takımların yüklenemedi',
+          message: turkishMatchError(teamsAsync.error!),
+          action: OutlinedButton.icon(
+            onPressed: () => ref.invalidate(myTeamsProvider),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Tekrar dene'),
+          ),
+        ),
       );
     }
 
-    Future<void> refresh() async {
-      ref.invalidate(myTeamsProvider);
-      ref.invalidate(pendingMatchesProvider);
-      ref.invalidate(matchHistoryProvider);
-      await ref.read(pendingMatchesProvider.future);
+    final List<Team> teams = teamsAsync.valueOrNull ?? const <Team>[];
+    final Widget goToPitches = FilledButton.icon(
+      onPressed: () => ref.read(selectedTabProvider.notifier).state = MainTab.pitches.index,
+      icon: const Icon(Icons.add_moderator_rounded),
+      label: Text(teams.isEmpty ? 'Takım kur' : 'Başka sahaya takım kur'),
+    );
+
+    if (teams.isEmpty) {
+      return Center(
+        child: EmptyState(
+          icon: Icons.shield_outlined,
+          title: 'Henüz bir takımın yok',
+          message: 'Bir halı saha seçip takımını kur; o sahadaki takımlara maç '
+              'teklifi gönderebilirsin.',
+          action: goToPitches,
+        ),
+      );
     }
 
     return RefreshIndicator(
-      onRefresh: refresh,
+      onRefresh: () async {
+        ref.invalidate(myTeamsProvider);
+        try {
+          await ref.read(myTeamsProvider.future);
+        } catch (_) {}
+      },
       child: ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 28),
-      children: <Widget>[
-        // --- Takım özeti ---------------------------------------------
-        for (final Team team in myTeams)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: _TeamSummaryCard(team: team),
-          ),
-
-        // --- BEKLEYEN MAÇLAR (4 aşamalı onay akışı) -------------------
-        SectionHeader(
-          title: 'Bekleyen Maçlar',
-          subtitle: pending.isEmpty
-              ? 'Şu an bekleyen maçın yok'
-              : '${pending.length} maç onay bekliyor',
-          icon: Icons.pending_actions_rounded,
-        ),
-        if (pending.isEmpty)
-          const EmptyState(
-            icon: Icons.inbox_outlined,
-            title: 'Bekleyen maç yok',
-            message: 'Saha detayından rakip takımlara maç teklifi gönderebilirsin.',
-            compact: true,
-          )
-        else
-          for (final PendingMatch match in pending)
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        children: <Widget>[
+          for (final Team team in teams)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: PendingMatchCard(match: match),
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _TeamSummaryCard(team: team),
             ),
-
-        // --- MAÇ GEÇMİŞİ (en yeniden eskiye) -------------------------
-        SectionHeader(
-          title: 'Maç Geçmişi',
-          subtitle: '${history.length} tamamlanmış maç',
-          icon: Icons.history_rounded,
-        ),
-        if (history.isEmpty)
-          const EmptyState(
-            icon: Icons.sports_soccer_outlined,
-            title: 'Henüz tamamlanmış maç yok',
-            compact: true,
-          )
-        else
-          for (final MatchHistoryEntry entry in history)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: MatchHistoryTile(
-                entry: entry,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MatchDetailScreen(matchId: entry.id),
-                  ),
-                ),
-              ),
-            ),
-      ],
+          const SizedBox(height: 4),
+          Center(child: goToPitches),
+        ],
       ),
     );
   }
@@ -447,7 +434,7 @@ class _TeamSummaryCard extends ConsumerWidget {
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute<bool>(
                           builder: (_) =>
-                              TeamFormScreen.editRoster(team: team, players: roster),
+                              TeamFormScreen.editRoster(team: team),
                         ),
                       ),
                       child: const Text('Kadro ekle'),

@@ -90,6 +90,13 @@ abstract final class AppConfig {
   static const String accountDeletionUrl =
       'https://trique06.github.io/halisaha_app/hesap-silme.html';
 
+  /// Destek, itiraz ve içerik kaldırma talepleri (yasal sayfalardakiyle aynı).
+  static const String supportEmail = 'omersarikan35@gmail.com';
+
+  /// Kabul edilen kullanım koşulları sürümü. Metin değişince artırılır;
+  /// sunucuya `accept_terms` ile kaydedilir.
+  static const String termsVersion = '2026-10-25';
+
   // -------------------------------------------------------------------
   // Telefon
   // -------------------------------------------------------------------

@@ -11,10 +11,12 @@ import '../pitches/pitch_detail_screen.dart';
 import '../profile/goalkeeper_profile_editor.dart';
 import 'widgets/month_calendar.dart';
 import 'widgets/popular_pitch_card.dart';
+import 'widgets/todo_section.dart';
 
 /// Ana Sayfa.
 ///
 /// Yukarıdan aşağıya sabit düzen:
+///   0. Yapılacaklar (yalnızca yanıt bekleyen maç varsa)
 ///   1. En Popüler Sahalar (yatay kaydırmalı 3 kart)
 ///   2. "Kaleci Profili Oluştur" geniş CTA butonu
 ///   3. Takvim (bugün vurgulu)
@@ -36,6 +38,9 @@ class HomeScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: <Widget>[
             SliverToBoxAdapter(child: _HomeHeader(user: user)),
+
+            // Kullanıcının yanıt vermesi gereken maç adımları en üstte.
+            const SliverToBoxAdapter(child: TodoSection()),
 
             // ---------------------------------------------------------
             // 1. EN POPÜLER SAHALAR

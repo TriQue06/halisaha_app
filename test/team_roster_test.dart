@@ -23,7 +23,7 @@ void main() {
 
     testWidgets('7 boş satırla başlar, 7 satırda silme yok', (WidgetTester tester) async {
       await tester.pumpWidget(host());
-      expect(find.widgetWithText(TextFormField, 'Ad'), findsNWidgets(kMinRosterSize));
+      expect(find.widgetWithText(TextFormField, 'Ad / takma ad'), findsNWidgets(kMinRosterSize));
       expect(find.byIcon(Icons.remove_circle_outline_rounded), findsNothing);
     });
 
@@ -42,7 +42,7 @@ void main() {
       expect(find.byIcon(Icons.remove_circle_outline_rounded), findsNothing);
     });
 
-    testWidgets('ad ve soyad zorunlu', (WidgetTester tester) async {
+    testWidgets('ad zorunlu, soyad isteğe bağlı', (WidgetTester tester) async {
       final GlobalKey<FormState> key = GlobalKey<FormState>();
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -53,15 +53,13 @@ void main() {
       ));
       expect(key.currentState!.validate(), isFalse);
 
-      for (final Finder f in <Finder>[
-        find.widgetWithText(TextFormField, 'Ad'),
-        find.widgetWithText(TextFormField, 'Soyad'),
-      ]) {
-        for (int i = 0; i < kMinRosterSize; i++) {
-          await tester.enterText(f.at(i), 'Oyuncu$i');
-        }
+      // Yalnızca adlar (takma ad olabilir) yeterli; soyad boş kalabilir.
+      final Finder names = find.widgetWithText(TextFormField, 'Ad / takma ad');
+      for (int i = 0; i < kMinRosterSize; i++) {
+        await tester.enterText(names.at(i), 'Oyuncu$i');
       }
       expect(key.currentState!.validate(), isTrue);
+      expect(controller.entries.every((RosterEntry e) => e.lastName.isEmpty), isTrue);
       expect(controller.entries.length, kMinRosterSize);
       expect(controller.entries.first.id, isNull);
     });

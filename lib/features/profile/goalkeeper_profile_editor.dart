@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/izmir_districts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/match_errors.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
 import 'widgets/avatar_editor.dart';
@@ -25,16 +26,25 @@ class GoalkeeperProfileEditor extends ConsumerStatefulWidget {
 
 class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEditor> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  late final TextEditingController _aboutController;
-  late Set<String> _selectedDistricts;
-  late bool _isAvailable;
+  final TextEditingController _aboutController = TextEditingController();
+  Set<String> _selectedDistricts = <String>{};
+  bool _isAvailable = true;
+
+  /// Form kayıtlı profille bir kez dolduruldu mu? Profil ekran açıldıktan
+  /// sonra gelirse (sekme ilk açılışta) form boş kalıyordu.
+  bool _filled = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    final Goalkeeper? existing = ref.read(myGoalkeeperProvider).valueOrNull;
+    final AsyncValue<Goalkeeper?> current = ref.read(myGoalkeeperProvider);
+    if (current.hasValue) _fill(current.value);
+  }
 
-    _aboutController = TextEditingController(text: existing?.about ?? '');
+  void _fill(Goalkeeper? existing) {
+    _filled = true;
+    _aboutController.text = existing?.about ?? '';
     _selectedDistricts = <String>{...?existing?.districts};
     _isAvailable = existing?.isAvailable ?? true;
   }
@@ -48,6 +58,7 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
   Future<void> _submit() async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);
+    setState(() => _isSaving = true);
 
     await ref.read(myGoalkeeperProvider.notifier).save(
           districts: IzmirDistricts.sorted(_selectedDistricts),
@@ -56,11 +67,12 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
         );
 
     if (!mounted) return;
+    setState(() => _isSaving = false);
 
     final AsyncValue<Goalkeeper?> result = ref.read(myGoalkeeperProvider);
     if (result.hasError) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Kaydedilemedi: ${result.error}')),
+        SnackBar(content: Text('Kaydedilemedi. ${turkishMatchError(result.error!)}')),
       );
       return;
     }
@@ -99,6 +111,33 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
     final UserProfile? user = ref.watch(currentUserProvider);
     final AsyncValue<Goalkeeper?> myGk = ref.watch(myGoalkeeperProvider);
     final Goalkeeper? existing = myGk.valueOrNull;
+    if (!_filled && myGk.hasValue && !myGk.isLoading) _fill(existing);
+
+    // İlk yükleme sürerken boş form göstermek, kullanıcıya profili yokmuş
+    // gibi görünüyordu.
+    if (!_filled) {
+      final Widget waiting = Center(
+        child: myGk.hasError
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(turkishMatchError(myGk.error!), textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () => ref.invalidate(myGoalkeeperProvider),
+                      child: const Text('Tekrar dene'),
+                    ),
+                  ],
+                ),
+              )
+            : const CircularProgressIndicator(),
+      );
+      return widget.embedded
+          ? waiting
+          : Scaffold(appBar: AppBar(title: const Text('Kaleci Profilim')), body: waiting);
+    }
 
     final Widget body = Form(
       key: _formKey,
@@ -241,20 +280,20 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
           const SizedBox(height: 16),
 
           FilledButton(
-            onPressed: _save,
+            onPressed: _isSaving ? null : _save,
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-            child: Text(existing == null ? 'Kaleci Profilimi Oluştur' : 'Değişiklikleri Kaydet'),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(existing == null ? 'Kaleci Profilimi Oluştur' : 'Değişiklikleri Kaydet'),
           ),
           if (existing != null) ...<Widget>[
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () async {
-                final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-                await ref.read(myGoalkeeperProvider.notifier).delete();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Kaleci profiliniz silindi.')),
-                );
-              },
+              onPressed: _isSaving ? null : _confirmDelete,
               child: const Text('Kaleci Profilimi Sil'),
             ),
           ],
@@ -270,6 +309,43 @@ class _GoalkeeperProfileEditorState extends ConsumerState<GoalkeeperProfileEdito
       ),
       body: body,
     );
+  }
+}
+
+extension on _GoalkeeperProfileEditorState {
+  Future<void> _confirmDelete() async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Kaleci profilin silinsin mi?'),
+        content: const Text('Kaleciler listesinden çıkarsın; aldığın puanlar da silinir.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    await ref.read(myGoalkeeperProvider.notifier).delete();
+    final AsyncValue<Goalkeeper?> result = ref.read(myGoalkeeperProvider);
+    if (result.hasError) {
+      // Silinemedi: başarı mesajı gösterme, kayıtlı profili geri getir.
+      messenger.showSnackBar(
+        SnackBar(content: Text('Silinemedi. ${turkishMatchError(result.error!)}')),
+      );
+      ref.invalidate(myGoalkeeperProvider);
+      return;
+    }
+    _fill(null);
+    messenger.showSnackBar(const SnackBar(content: Text('Kaleci profiliniz silindi.')));
   }
 }
 

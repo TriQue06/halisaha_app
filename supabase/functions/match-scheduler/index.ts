@@ -12,12 +12,12 @@
 //   select cron.schedule(
 //     'halisaha-edge-scheduler', '*/15 * * * *',
 //     $$
---     select net.http_post(
---       url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/match-scheduler',
---       headers := jsonb_build_object(
---                    'Content-Type','application/json',
---                    'Authorization','Bearer <SERVICE_ROLE_KEY>')
---     );
+//     select net.http_post(
+//       url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/match-scheduler',
+//       headers := jsonb_build_object(
+//                    'Content-Type','application/json',
+//                    'Authorization','Bearer <SERVICE_ROLE_KEY>')
+//     );
 //     $$
 //   );
 // =====================================================================

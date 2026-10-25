@@ -179,7 +179,6 @@ class Team {
     required this.pitchId,
     required this.captainId,
     required this.name,
-    required this.contactPhone,
     this.wins = 0,
     this.draws = 0,
     this.losses = 0,
@@ -189,7 +188,6 @@ class Team {
   final String pitchId;
   final String captainId;
   final String name;
-  final String contactPhone;
   final int wins; // G
   final int draws; // B
   final int losses; // M
@@ -351,8 +349,7 @@ class TeamPlayer {
   const TeamPlayer({
     required this.id,
     required this.teamId,
-    required this.firstName,
-    required this.lastName,
+    required this.displayName,
     this.appearances = 0,
     this.goals = 0,
     this.assists = 0,
@@ -363,8 +360,7 @@ class TeamPlayer {
     return TeamPlayer(
       id: row['player_id'] as String,
       teamId: (row['team_id'] as String?) ?? '',
-      firstName: (row['first_name'] as String?) ?? '',
-      lastName: (row['last_name'] as String?) ?? '',
+      displayName: (row['display_name'] as String?) ?? '',
       appearances: (row['appearances'] as num?)?.toInt() ?? 0,
       goals: (row['goals'] as num?)?.toInt() ?? 0,
       assists: (row['assists'] as num?)?.toInt() ?? 0,
@@ -373,13 +369,31 @@ class TeamPlayer {
 
   final String id;
   final String teamId;
-  final String firstName;
-  final String lastName;
+
+  /// Herkese görünen ad: "Ahmet Y." Soyadın tamamı yalnızca kaptana açık
+  /// (kayıtlı olmayan kişilerin kişisel verisi, App Store 5.1).
+  final String displayName;
   final int appearances;
   final int goals;
   final int assists;
 
-  String get fullName => '$firstName $lastName'.trim();
+  String get fullName => displayName;
+}
+
+/// Kaptanın kadro düzenleme ekranı için tam ad (`get_team_roster_full`).
+@immutable
+class RosterMember {
+  const RosterMember({required this.id, required this.firstName, required this.lastName});
+
+  factory RosterMember.fromRow(Map<String, dynamic> row) => RosterMember(
+        id: row['id'] as String,
+        firstName: (row['first_name'] as String?) ?? '',
+        lastName: (row['last_name'] as String?) ?? '',
+      );
+
+  final String id;
+  final String firstName;
+  final String lastName;
 }
 
 /// Kadro formundan gönderilen satır (id yoksa yeni oyuncu).
@@ -415,7 +429,7 @@ class LeaderboardEntry {
   factory LeaderboardEntry.fromRow(Map<String, dynamic> row) {
     return LeaderboardEntry(
       playerId: row['player_id'] as String,
-      name: '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim(),
+      name: (row['display_name'] as String?) ?? '',
       teamId: (row['team_id'] as String?) ?? '',
       teamName: (row['team_name'] as String?) ?? '',
       appearances: (row['appearances'] as num?)?.toInt() ?? 0,
@@ -449,7 +463,7 @@ class LineupPlayer {
     return LineupPlayer(
       playerId: (row['player_id'] as String?) ?? '',
       teamId: (row['team_id'] as String?) ?? '',
-      name: '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim(),
+      name: (row['display_name'] as String?) ?? '',
       slot: (row['slot'] as num?)?.toInt() ?? 0,
       goals: (row['goals'] as num?)?.toInt() ?? 0,
       assists: (row['assists'] as num?)?.toInt() ?? 0,
@@ -604,6 +618,21 @@ class PendingMatch {
     return DateTime.now().isAfter(date.add(const Duration(hours: 1)));
   }
 
+  /// Teklif sahibi skoru maçtan sonraki 24 saat içinde girmezse rakip
+  /// kaptan da girebilir (sunucu: `report_match_score`).
+  bool get canReportScore {
+    if (isChallenger) return isResultDue;
+    final DateTime? date = matchDate;
+    return date != null && DateTime.now().isAfter(date.add(const Duration(hours: 25)));
+  }
+
+  /// Kabul edilmiş ve sonuçlanmamış maç iptal edilebilir (teklif aşaması
+  /// kendi "Reddet / Geri Çek" butonlarıyla yönetiliyor).
+  bool get canCancel =>
+      status == MatchStatus.accepted ||
+      status == MatchStatus.mutuallyAgreed ||
+      status == MatchStatus.scheduled;
+
   /// Maç gün/saati hâlâ değiştirilebilir mi?
   ///
   /// Tarih henüz girilmediyse ya da maç saati gelmediyse evet. Maç
@@ -655,6 +684,8 @@ class PendingMatch {
   }
 
   PendingMatch copyWith({
+    String? opponentPhone,
+    String? opponentCaptainName,
     MatchStatus? status,
     bool? myTeamReady,
     bool? opponentReady,
@@ -670,8 +701,8 @@ class PendingMatch {
       myTeamId: myTeamId,
       teamSize: teamSize,
       myLineupCount: myLineupCount,
-      opponentPhone: opponentPhone,
-      opponentCaptainName: opponentCaptainName,
+      opponentPhone: opponentPhone ?? this.opponentPhone,
+      opponentCaptainName: opponentCaptainName ?? this.opponentCaptainName,
       pitchName: pitchName,
       status: status ?? this.status,
       isChallenger: isChallenger,

@@ -332,22 +332,23 @@ String turkishAuthError(Object error) {
   if (raw.contains('sms') || raw.contains('phone provider')) {
     return 'SMS gönderilemedi. Telefon girişi henüz yapılandırılmamış olabilir.';
   }
-  // SMTP tarafı: Supabase e-postayı gönderemedi.
-  // En sık sebepleri: özel SMTP hiç kurulmamış (yerleşik servis yalnızca
-  // proje ekibine gönderir) ya da sağlayıcı alıcıyı reddetti (Resend'in
-  // onboarding@resend.dev adresi sadece hesap sahibine gönderebilir).
+  // SMTP tarafı: Supabase e-postayı gönderemedi (servis ayarı ya da
+  // sağlayıcının alıcıyı reddetmesi). Kullanıcıya teknik ayrıntı değil,
+  // yapabileceği şey söylenir.
   if (raw.contains('error sending confirmation email') ||
       raw.contains('error sending recovery email') ||
       raw.contains('error sending email') ||
+      raw.contains('email address not authorized') ||
       raw.contains('unexpected_failure')) {
-    return 'Doğrulama e-postası gönderilemedi. Bu bir uygulama hatası değil, '
-        'e-posta servisi ayarından kaynaklanıyor. Supabase → Project Settings '
-        '→ Authentication → SMTP ayarlarını kontrol et.';
+    return 'Doğrulama e-postası şu an gönderilemedi. Birkaç dakika sonra tekrar '
+        'dene; sorun sürerse destek adresimize yaz.';
   }
-  if (raw.contains('email address not authorized')) {
-    return 'Bu adrese e-posta gönderme yetkisi yok. Supabase varsayılan '
-        'e-posta servisi yalnızca proje ekibine gönderir; özel bir SMTP '
-        'sağlayıcı bağlaman gerekiyor.';
+  // Kayıt trigger'ı profili oluşturamadı: uygunsuz ad ya da 18 yaş kuralı.
+  if (raw.contains('database error saving new user') ||
+      raw.contains('uygunsuz ifade') ||
+      raw.contains('18 yas')) {
+    return 'Kayıt tamamlanamadı. Adında uygunsuz bir ifade olmadığından ve 18 '
+        'yaşından büyük olduğundan emin ol.';
   }
   if (raw.contains('over_email_send_rate_limit') || raw.contains('rate limit')) {
     return 'Çok fazla deneme yaptın. Biraz bekleyip tekrar dene.';
@@ -355,5 +356,5 @@ String turkishAuthError(Object error) {
   if (raw.contains('socketexception') || raw.contains('failed host lookup')) {
     return 'İnternet bağlantısı kurulamadı.';
   }
-  return 'Bir hata oluştu: $error';
+  return 'Bir hata oluştu. Lütfen tekrar dene.';
 }

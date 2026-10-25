@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/match_errors.dart';
 import '../../../models/models.dart';
 import '../../../state/app_providers.dart';
 
@@ -54,7 +55,7 @@ class _PhoneEditorSheetState extends ConsumerState<_PhoneEditorSheet> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
       if (mounted) {
-        setState(() => _error = 'Numara kaydedilemedi: $error');
+        setState(() => _error = 'Numara kaydedilemedi. ${turkishMatchError(error)}');
       }
     } finally {
       if (mounted) setState(() => _isBusy = false);

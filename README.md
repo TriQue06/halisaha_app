@@ -1,6 +1,18 @@
 # Japon Kale ⚽
 
-İzmir için halı saha maç ayarlama ve kaleci bulma uygulaması.
+İzmir'de halı saha çevresinde takımları ve kalecileri buluşturan mobil uygulama
+(Flutter + Supabase). iOS (App Store), Android (Google Play) ve web önizleme.
+
+## Ne yapar?
+
+- **Takım kaptanı:** bir sahaya takım kurar (en az 7 kişilik kadro), o sahadaki
+  takımlara maç teklifi gönderir, maçı kilitler (gün/saat + 5v5–11v11), maç
+  kadrosunu seçer, skoru ve gol/asistleri girer.
+- **Kaleci:** oynayabildiği ilçeleri ve müsaitliğini yayımlar; takımlar
+  arayarak ulaşır, oyuncular puan verir.
+- **Herkes:** sahaları, takım profillerini (kadro, skorlu maç geçmişi) ve
+  sahaların gol/asist krallığını inceler.
+- **Güvenlik:** raporlama, engelleme, panelden banlama, uygunsuz ifade filtresi.
 
 ## Çalıştırma
 
@@ -12,53 +24,59 @@ flutter pub get
 flutter run
 ```
 
+Release (APK/AAB) için `android/key.properties` şart; yoksa derleme bilerek durur.
+
 ## Mimari
 
 ```
 lib/
-├── main.dart                       # ProviderScope + MaterialApp (tema, tr_TR, textScale)
-├── core/
-│   ├── theme/app_colors.dart       # Koyu yeşil paleti + anlamsal renkler (G/B/M)
-│   ├── theme/app_theme.dart        # Açık (yeşil+beyaz) & koyu (yeşil+siyah) tema
-│   ├── constants/izmir_districts.dart  # 30 ilçe + Türkçe alfabetik sıralayıcı
-│   └── widgets/common_widgets.dart # SectionHeader, RatingStars, StatBadge, InfoPill...
-├── models/models.dart              # Enum'lar + modeller + PendingMatch aşama makinesi
-├── data/mock_data.dart             # Statik mock veriler (Supabase'e geçişte silinir)
-├── state/
-│   ├── settings_controller.dart    # Tema / yazı boyutu / bildirimler (kalıcı)
-│   └── app_providers.dart          # Riverpod provider ve controller'ları
+├── main.dart                     # Açılış, tema, yerelleştirme, yazı ölçeği
+├── core/                         # tema, sabitler, push servisi, ortak widget'lar
+├── models/models.dart            # Modeller + PendingMatch aşama makinesi
+├── data/                         # Supabase depoları (maç, takım/kadro, moderasyon)
+├── state/                        # Riverpod provider'ları ve aksiyonlar
 └── features/
-    ├── shell/main_shell.dart       # 5'li BottomNavigationBar
-    ├── home/                       # Popüler sahalar → Kaleci CTA → Takvim
-    ├── pitches/                    # Saha listesi + saha detayı (MEYDAN OKU kuralı)
-    ├── goalkeepers/                # İlçe seçici + kaleci kartları
-    ├── profile/                    # Takımım / Kaleci Profilim + bekleyen maçlar
-    └── settings/                   # Tema, yazı boyutu, bildirim ayarları
+    ├── auth/                     # Giriş, kayıt, e-posta kodu, profil tamamlama
+    ├── shell/                    # Ana Sayfa · Sahalar · Maçlar · Kaleciler · Profil
+    ├── home/                     # Yapılacaklar, popüler sahalar, takvim
+    ├── pitches/                  # Saha listesi (ilçe filtresi) + saha detayı
+    ├── matches/                  # Bekleyen maçlar + maç geçmişi
+    ├── teams/                    # Takım kurma/kadro, takım profili, maç kadrosu, skor
+    ├── goalkeepers/              # Kaleci listesi
+    ├── profile/                  # Takımlarım, kaleci profili, maç kartı
+    ├── moderation/               # Rapor et / engelle
+    └── settings/                 # Tema, yazı, bildirim tercihleri, hesap silme
 ```
 
-State management: **Riverpod 2** (`Notifier` / `Provider` / `Provider.family`).
-Ekranlar mock veriyi doğrudan bilmez; yalnızca provider'ları izler. Supabase'e
-geçişte `data/mock_data.dart` yerine repository implementasyonları konulur,
-UI kodu değişmez.
+Ekranlar Supabase'i doğrudan çağırmaz; provider'lar üzerinden depolara gider.
+Yetki ve iş kuralları (kim neyi yapabilir, durum geçişleri, kadro sayısı,
+skor) **veritabanında** denetlenir; uygulama yalnızca doğru butonu gösterir.
 
-## Bekleyen Maçlar — 4 aşamalı onay akışı
+## Maç akışı
 
-`PendingMatch.stage` tek doğruluk kaynağıdır; kart hangi butonu göstereceğine
-buradan karar verir:
-
-| Aşama | Durum | Görünen aksiyon | İletişim bilgisi |
+| Aşama | Durum | Aksiyon | İletişim |
 |---|---|---|---|
-| 1 | `pending` | Kabul Et / Reddet (veya "yanıt bekleniyor") | 🔒 gizli |
-| 2 | `accepted` | **Maça Hazırım** + 1 haftalık geri sayım | 🔒 gizli |
-| 3 | `mutuallyAgreed` / `scheduled` | Maç gün-saati belirle | 🔓 **açık** |
-| 4 | `scheduled` + maç saati +1sa geçti | Kazandık / Berabere / Kaybettik | 🔓 açık |
+| 1 | `pending` | Kabul / Reddet (7 günde yanıt yoksa düşer) | gizli |
+| 2 | `accepted` | **Maça Hazırım** (iki taraf, 7 gün) | gizli |
+| 3 | `mutually_agreed` / `scheduled` | Gün-saat + kaç kişilik, maç kadrosu | **açık** |
+| 4 | maç saati + 1 sa | Skor + gol/asist (teklif sahibi; 24 sa girmezse rakip) | açık |
 
-1 hafta içinde iki taraf da onaylamazsa aşama `expired` olur (backend'deki
-`auto_cancel_stale_matches()` cron'u ile eşleşir).
+Kabul edilmiş maç her aşamada iptal edilebilir. Gol/asist ve kadro maçtan
+sonraki 7 gün içinde düzeltilebilir.
+
+## Gizlilik kuralları (veritabanında)
+
+- Telefon ve doğum tarihi başka kullanıcılara okunamaz; rakibin numarası yalnızca
+  iki taraf "Maça Hazırım" dedikten sonra `get_opponent_contact` ile gelir.
+- Kayıtlı olmayan oyuncuların soyadı başkalarına baş harf olarak görünür
+  ("Ahmet Y."); tam ad yalnızca takımın kaptanına açıktır.
+- Engellenen/banlanan kullanıcıların takımları ve kaleci profilleri listelerden
+  düşer; banlı hesap hiçbir yoldan yazamaz ama hesabını silebilir.
 
 ## Veritabanı
 
-Supabase şeması `supabase/` klasöründedir — bkz. [supabase/README.md](supabase/README.md).
+Şema ve kurulum: [supabase/README.md](supabase/README.md). Migration'lar
+`supabase/migrations` altında, tarih sırasıyla SQL Editor'de çalıştırılır.
 
 ## Test
 
@@ -66,5 +84,10 @@ Supabase şeması `supabase/` klasöründedir — bkz. [supabase/README.md](supa
 flutter test
 ```
 
-Aşama makinesi, onay akışı controller'ı, popüler saha sıralaması, Türkçe
-alfabetik sıralama ve açılış smoke testi kapsanır.
+```bash
+cd supabase/tests && npm install && npm test
+```
+
+İlki model, form ve ekran testleri; ikincisi tüm migration'ları gerçek bir
+Postgres'te çalıştırıp yetki ve maç akışı senaryolarını dener
+(bkz. [supabase/tests/README.md](supabase/tests/README.md)).

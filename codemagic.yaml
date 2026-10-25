@@ -50,6 +50,13 @@ workflows:
       - name: Bağımlılıklar
         script: flutter pub get
 
+      # Analiz ya da testler kırılırsa derleme durur; TestFlight'a bozuk
+      # yapı gitmez.
+      - name: Analiz ve testler
+        script: |
+          flutter analyze
+          flutter test
+
       - name: Google iOS URL şeması
         script: |
           sed -i '' "s/^GOOGLE_REVERSED_CLIENT_ID=.*/GOOGLE_REVERSED_CLIENT_ID=${GOOGLE_REVERSED_CLIENT_ID}/" ios/Flutter/AppConfig.xcconfig

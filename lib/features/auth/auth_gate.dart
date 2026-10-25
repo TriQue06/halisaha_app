@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/config/app_config.dart';
+import '../../core/widgets/legal_consent.dart';
 import '../../state/auth_controller.dart';
+import '../settings/delete_account_dialog.dart';
 import '../shell/main_shell.dart';
 import 'complete_profile_screen.dart';
 import 'login_screen.dart';
@@ -45,6 +48,10 @@ class AuthGate extends ConsumerWidget {
             onSignOut: () => ref.read(authControllerProvider).signOut(),
           );
         }
+        // Giriş öncesi kutuda kabul edilen koşulları profile yaz (arka planda).
+        if (data != null) {
+          TermsAcceptance.syncToServer(ref.read(supabaseProvider), data);
+        }
         if (!isProfileComplete(data)) return const CompleteProfileScreen();
         return const MainShell();
       },
@@ -78,13 +85,20 @@ class _BannedScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Topluluk kurallarını ihlal ettiği için hesabın kullanıma '
-                'kapatıldı. İtiraz için omersarikan35@gmail.com adresine yazabilirsin.',
+                'kapatıldı. İtiraz için ${AppConfig.supportEmail} adresine yazabilirsin.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 20),
               FilledButton(onPressed: onSignOut, child: const Text('Çıkış Yap')),
+              const SizedBox(height: 8),
+              // Askıya alınan kullanıcı da hesabını ve verisini silebilmeli.
+              TextButton(
+                onPressed: () => showDeleteAccountDialog(context),
+                style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+                child: const Text('Hesabımı sil'),
+              ),
             ],
           ),
         ),

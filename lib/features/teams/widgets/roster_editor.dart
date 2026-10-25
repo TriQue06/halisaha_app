@@ -24,8 +24,8 @@ class _RosterRow {
 /// Kadro satırlarını tutar. Başlangıçta en az [kMinRosterSize] satır var;
 /// "Yeni Oyuncu Ekle" ile satır eklenir, fazlalar silinebilir.
 class RosterController extends ChangeNotifier {
-  RosterController([List<TeamPlayer> players = const <TeamPlayer>[]]) {
-    for (final TeamPlayer p in players) {
+  RosterController([List<RosterMember> players = const <RosterMember>[]]) {
+    for (final RosterMember p in players) {
       _rows.add(_RosterRow(id: p.id, firstName: p.firstName, lastName: p.lastName));
     }
     while (_rows.length < kMinRosterSize) {
@@ -70,7 +70,8 @@ class RosterController extends ChangeNotifier {
 
 /// Kadro satırları (ad + soyad) ve en altta "Yeni Oyuncu Ekle" butonu.
 ///
-/// Bir [Form] içinde kullanılır; her satırın ad ve soyadı zorunlu.
+/// Bir [Form] içinde kullanılır. Ad (ya da takma ad) zorunlu, soyad
+/// isteğe bağlı: diğer kullanıcılar soyadın yalnızca baş harfini görür.
 class RosterEditor extends StatelessWidget {
   const RosterEditor({super.key, required this.controller});
 
@@ -79,9 +80,11 @@ class RosterEditor extends StatelessWidget {
   static String? _required(String? value, String label) {
     final String v = value?.trim() ?? '';
     if (v.isEmpty) return '$label gerekli';
-    if (v.length > 40) return 'En fazla 40 karakter';
-    return null;
+    return _maxLength(v);
   }
+
+  static String? _maxLength(String? value) =>
+      (value?.trim().length ?? 0) > 40 ? 'En fazla 40 karakter' : null;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +121,10 @@ class RosterEditor extends StatelessWidget {
                         controller: controller._rows[i].first,
                         textCapitalization: TextCapitalization.words,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(labelText: 'Ad', isDense: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Ad / takma ad',
+                          isDense: true,
+                        ),
                         validator: (String? v) => _required(v, 'Ad'),
                       ),
                     ),
@@ -128,8 +134,11 @@ class RosterEditor extends StatelessWidget {
                         controller: controller._rows[i].last,
                         textCapitalization: TextCapitalization.words,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(labelText: 'Soyad', isDense: true),
-                        validator: (String? v) => _required(v, 'Soyad'),
+                        decoration: const InputDecoration(
+                          labelText: 'Soyad (isteğe bağlı)',
+                          isDense: true,
+                        ),
+                        validator: _maxLength,
                       ),
                     ),
                     SizedBox(

@@ -8,18 +8,16 @@ class AppSettings {
   const AppSettings({
     this.themeMode = ThemeMode.system,
     this.textScale = 1.0,
-    this.matchNotifications = true,
-    this.challengeNotifications = true,
-    this.goalkeeperNotifications = false,
   });
 
   final ThemeMode themeMode;
 
-  /// Uygulama genelindeki yazı boyutu çarpanı (0.8 - 1.4).
+  /// Uygulama içi yazı boyutu çarpanı (0.8 - 1.4). Telefonun erişilebilirlik
+  /// yazı boyutunun ÜZERİNE uygulanır, onu ezmez.
+  ///
+  /// Bildirim tercihleri burada değil: push gönderimini etkileyebilmeleri
+  /// için sunucuda (profiles) tutuluyorlar.
   final double textScale;
-  final bool matchNotifications;
-  final bool challengeNotifications;
-  final bool goalkeeperNotifications;
 
   /// Yalnızca "koyu seçili mi" bilgisi; sistem modunda anlamı yoktur,
   /// gerçek görünüm için `Theme.of(context).brightness` kullanılmalı.
@@ -28,16 +26,10 @@ class AppSettings {
   AppSettings copyWith({
     ThemeMode? themeMode,
     double? textScale,
-    bool? matchNotifications,
-    bool? challengeNotifications,
-    bool? goalkeeperNotifications,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
       textScale: textScale ?? this.textScale,
-      matchNotifications: matchNotifications ?? this.matchNotifications,
-      challengeNotifications: challengeNotifications ?? this.challengeNotifications,
-      goalkeeperNotifications: goalkeeperNotifications ?? this.goalkeeperNotifications,
     );
   }
 }
@@ -49,9 +41,6 @@ class SettingsController extends Notifier<AppSettings> {
   static const String _kThemeDark = 'settings.theme_dark';
   static const String _kThemeMode = 'settings.theme_mode';
   static const String _kTextScale = 'settings.text_scale';
-  static const String _kMatchNotif = 'settings.notif_match';
-  static const String _kChallengeNotif = 'settings.notif_challenge';
-  static const String _kGoalkeeperNotif = 'settings.notif_goalkeeper';
 
   SharedPreferences? _prefs;
 
@@ -89,9 +78,6 @@ class SettingsController extends Notifier<AppSettings> {
     state = AppSettings(
       themeMode: mode,
       textScale: prefs.getDouble(_kTextScale) ?? 1.0,
-      matchNotifications: prefs.getBool(_kMatchNotif) ?? true,
-      challengeNotifications: prefs.getBool(_kChallengeNotif) ?? true,
-      goalkeeperNotifications: prefs.getBool(_kGoalkeeperNotif) ?? false,
     );
   }
 
@@ -109,21 +95,6 @@ class SettingsController extends Notifier<AppSettings> {
     final double clamped = scale.clamp(0.8, 1.4);
     state = state.copyWith(textScale: clamped);
     _prefs?.setDouble(_kTextScale, clamped);
-  }
-
-  void setMatchNotifications(bool value) {
-    state = state.copyWith(matchNotifications: value);
-    _prefs?.setBool(_kMatchNotif, value);
-  }
-
-  void setChallengeNotifications(bool value) {
-    state = state.copyWith(challengeNotifications: value);
-    _prefs?.setBool(_kChallengeNotif, value);
-  }
-
-  void setGoalkeeperNotifications(bool value) {
-    state = state.copyWith(goalkeeperNotifications: value);
-    _prefs?.setBool(_kGoalkeeperNotif, value);
   }
 }
 

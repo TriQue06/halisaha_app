@@ -2,9 +2,9 @@ import java.util.Properties
 import java.io.FileInputStream
 
 // Yayin imzalama bilgileri android/key.properties dosyasindan okunur.
-// Bu dosya surum kontrolune GIRMEZ (.gitignore'da). Yoksa derleme debug
-// anahtariyla imzalanir; boylece gelistirme akisi bozulmaz ama Play
-// Store'a yuklenecek yapinin key.properties ile uretilmesi zorunludur.
+// Bu dosya surum kontrolune GIRMEZ (.gitignore'da). Yoksa release
+// derlemesi (APK/AAB) DURUR: debug anahtariyla imzalanmis bir paket fark
+// edilmeden Play'e gonderilmesin. Debug derleme etkilenmez.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseSigning = keystorePropertiesFile.exists()
@@ -93,4 +93,18 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// key.properties yoksa release paketi uretme (bkz. dosya basi).
+gradle.taskGraph.whenReady {
+    val buildsRelease = allTasks.any { task ->
+        (task.name.startsWith("assemble") || task.name.startsWith("bundle")) &&
+            task.name.endsWith("Release")
+    }
+    if (buildsRelease && !hasReleaseSigning) {
+        throw GradleException(
+            "android/key.properties bulunamadi: release paketi yayin anahtari olmadan " +
+                "uretilemez. Anahtar bilgilerini key.properties'e ekleyin.",
+        )
+    }
 }

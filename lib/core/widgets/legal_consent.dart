@@ -1,7 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
 import 'legal_sheet.dart';
+
+/// Kullanım koşullarının kabulünü kayıt altına alır.
+///
+/// Kutu işaretlendiği an oturum henüz yok (giriş/kayıt öncesi); bu yüzden
+/// kabul önce cihazda hatırlanıyor, oturum açılınca [syncToServer] ile
+/// profile sürüm ve tarihle yazılıyor (`accept_terms`). Daha önce kabul
+/// eden kullanıcıya kutu tekrar boş gösterilmiyor.
+abstract final class TermsAcceptance {
+  static const String _key = 'legal.accepted_terms_version';
+
+  /// AuthGate her yeniden çizildiğinde tekrar istek atılmasın.
+  static String? _syncedFor;
+
+  static Future<void> remember(bool accepted) async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      if (accepted) {
+        await prefs.setString(_key, AppConfig.termsVersion);
+      } else {
+        await prefs.remove(_key);
+      }
+    } catch (error) {
+      debugPrint('Koşul kabulü cihazda saklanamadı: $error');
+    }
+  }
+
+  /// Bu cihazda güncel koşullar kabul edilmiş mi?
+  static Future<bool> isAccepted() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_key) == AppConfig.termsVersion;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Profilde güncel sürüm kayıtlı değilse ve cihazda kabul varsa sunucuya
+  /// yazar. Hata girişi engellemez; bir sonraki açılışta tekrar denenir.
+  static Future<void> syncToServer(SupabaseClient client, Map<String, dynamic> profile) async {
+    final String? uid = profile['id'] as String?;
+    if (profile['terms_version'] == AppConfig.termsVersion || _syncedFor == uid) return;
+    _syncedFor = uid;
+    if (!await isAccepted()) return;
+    try {
+      await client.rpc<void>('accept_terms', params: <String, dynamic>{
+        'p_version': AppConfig.termsVersion,
+      });
+    } catch (error) {
+      debugPrint('Koşul kabulü sunucuya yazılamadı: $error');
+    }
+  }
+}
 
 /// "Kullanım koşullarını ve gizlilik politikasını kabul ediyorum" onayı.
 ///
@@ -49,7 +103,12 @@ class LegalConsent extends StatelessWidget {
 
     return CheckboxListTile(
       value: value,
-      onChanged: enabled ? (bool? v) => onChanged(v ?? false) : null,
+      onChanged: enabled
+          ? (bool? v) {
+              TermsAcceptance.remember(v ?? false);
+              onChanged(v ?? false);
+            }
+          : null,
       controlAffinity: ListTileControlAffinity.leading,
       contentPadding: EdgeInsets.zero,
       dense: true,

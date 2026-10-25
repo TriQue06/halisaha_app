@@ -69,11 +69,15 @@ class JaponKaleApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // Ayarlardaki yazı boyutu slider'ı tüm uygulamaya buradan yansır.
+      // Ayarlardaki yazı boyutu, telefonun erişilebilirlik yazı boyutunun
+      // üzerine çarpan olarak uygulanır (önceden sistem ayarını eziyordu).
+      // Düzen bozulmasın diye toplam 0.8 - 2.0 aralığında tutulur.
       builder: (BuildContext context, Widget? child) {
-        return MediaQuery.withClampedTextScaling(
-          minScaleFactor: settings.textScale,
-          maxScaleFactor: settings.textScale,
+        final MediaQueryData media = MediaQuery.of(context);
+        final double system = media.textScaler.scale(14) / 14;
+        final double scale = (system * settings.textScale).clamp(0.8, 2.0);
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(scale)),
           child: child ?? const SizedBox.shrink(),
         );
       },

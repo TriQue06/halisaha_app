@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/match_errors.dart';
 import '../../core/utils/phone_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../data/moderation_repository.dart';
@@ -20,7 +21,12 @@ class GoalkeepersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String? selectedDistrict = ref.watch(selectedDistrictProvider);
-    final AsyncValue<List<Goalkeeper>> goalkeepers = ref.watch(goalkeepersProvider);
+    final bool onlyAvailable = ref.watch(onlyAvailableGoalkeepersProvider);
+    final AsyncValue<List<Goalkeeper>> goalkeepers = ref.watch(goalkeepersProvider).whenData(
+          (List<Goalkeeper> all) => onlyAvailable
+              ? all.where((Goalkeeper g) => g.isAvailable).toList(growable: false)
+              : all,
+        );
     final ThemeData theme = Theme.of(context);
 
     Future<void> refresh() async {
@@ -66,6 +72,14 @@ class GoalkeepersScreen extends ConsumerWidget {
                   ),
                 ),
                 const Spacer(),
+                FilterChip(
+                  label: const Text('Müsait'),
+                  selected: onlyAvailable,
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (bool v) =>
+                      ref.read(onlyAvailableGoalkeepersProvider.notifier).state = v,
+                ),
+                const SizedBox(width: 8),
                 goalkeepers.when(
                   loading: () => const SizedBox(
                     width: 14,
@@ -92,7 +106,7 @@ class GoalkeepersScreen extends ConsumerWidget {
               child: goalkeepers.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (Object error, StackTrace stack) => _ErrorView(
-                  message: error.toString(),
+                  message: turkishMatchError(error),
                   onRetry: refresh,
                 ),
                 data: (List<Goalkeeper> list) {
@@ -215,7 +229,7 @@ class GoalkeepersScreen extends ConsumerWidget {
                             );
                           } catch (error) {
                             messenger.showSnackBar(
-                              SnackBar(content: Text('Puan verilemedi: $error')),
+                              SnackBar(content: Text('Puan verilemedi. ${turkishMatchError(error)}')),
                             );
                           }
                         },

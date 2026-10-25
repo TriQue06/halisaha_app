@@ -42,7 +42,7 @@ class _AvatarEditorSheetState extends ConsumerState<_AvatarEditorSheet> {
         imageQuality: 85,
       );
     } catch (error) {
-      _fail('Fotoğraf seçilemedi. Uygulamanın galeri/kamera iznini kontrol et.\n($error)');
+      _fail('Fotoğraf seçilemedi. Uygulamanın galeri/kamera iznini kontrol et.');
       return;
     }
     if (file == null) return; // kullanıcı vazgeçti
@@ -63,7 +63,9 @@ class _AvatarEditorSheetState extends ConsumerState<_AvatarEditorSheet> {
     } on FormatException catch (error) {
       _fail(error.message);
     } catch (error) {
-      _fail('İşlem tamamlanamadı. İnternet bağlantını kontrol edip tekrar dene.\n($error)');
+      _fail(error is FormatException
+          ? error.message
+          : 'İşlem tamamlanamadı. İnternet bağlantını kontrol edip tekrar dene.');
     }
   }
 

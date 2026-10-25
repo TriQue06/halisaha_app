@@ -56,3 +56,7 @@ android/app/*.keystore
 
 # Firebase service account / gizli anahtarlar
 **/serviceAccountKey.json
+
+# Veritabani testlerinin Node bagimliliklari
+supabase/tests/node_modules/
+supabase/tests/package-lock.json

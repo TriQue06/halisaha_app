@@ -76,7 +76,7 @@ class TeamProfileScreen extends ConsumerWidget {
                           ? () => Navigator.of(context).push(
                                 MaterialPageRoute<bool>(
                                   builder: (_) =>
-                                      TeamFormScreen.editRoster(team: team, players: roster),
+                                      TeamFormScreen.editRoster(team: team),
                                 ),
                               )
                           : null,

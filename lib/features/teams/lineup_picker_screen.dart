@@ -11,16 +11,32 @@ import 'team_form_screen.dart';
 /// Maç kadrosu seçimi: maç kaç kişilikse o kadar boş yer açılır ve kaptan
 /// her yere kadrosundan bir oyuncu seçer.
 class LineupPickerScreen extends ConsumerStatefulWidget {
-  const LineupPickerScreen({super.key, required this.match});
+  const LineupPickerScreen({
+    super.key,
+    required this.matchId,
+    required this.myTeamId,
+    required this.teamSize,
+    required this.opponentName,
+  });
 
-  final PendingMatch match;
+  /// Bekleyen maç kartından.
+  LineupPickerScreen.forMatch(PendingMatch match, {super.key})
+      : matchId = match.id,
+        myTeamId = match.myTeamId,
+        teamSize = match.teamSize ?? 0,
+        opponentName = match.opponentTeamName;
+
+  final String matchId;
+  final String myTeamId;
+  final int teamSize;
+  final String opponentName;
 
   @override
   ConsumerState<LineupPickerScreen> createState() => _LineupPickerScreenState();
 }
 
 class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
-  late List<String?> _slots = List<String?>.filled(widget.match.teamSize ?? 0, null);
+  late List<String?> _slots = List<String?>.filled(widget.teamSize, null);
   bool _prefilled = false;
   bool _isBusy = false;
 
@@ -34,7 +50,7 @@ class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
     final List<LineupPlayer> mine = <LineupPlayer>[
       ...detail.challenger.lineup,
       ...detail.opponent.lineup,
-    ].where((LineupPlayer p) => p.teamId == widget.match.myTeamId).toList();
+    ].where((LineupPlayer p) => p.teamId == widget.myTeamId).toList();
     final List<String?> slots = List<String?>.filled(_slots.length, null);
     for (int i = 0; i < mine.length && i < slots.length; i++) {
       // Kadrodan çıkarılmış oyuncu yeniden seçilmeli.
@@ -50,7 +66,7 @@ class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
     try {
       await ref
           .read(teamActionsProvider)
-          .setLineup(widget.match.id, _slots.whereType<String>().toList());
+          .setLineup(widget.matchId, _slots.whereType<String>().toList());
       messenger.showSnackBar(const SnackBar(content: Text('Maç kadrosu kaydedildi.')));
       navigator.pop();
     } catch (error) {
@@ -59,14 +75,14 @@ class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
     }
   }
 
-  Future<void> _editRoster(List<TeamPlayer> roster) async {
+  Future<void> _editRoster() async {
     final Team? team = (ref.read(myTeamsProvider).valueOrNull ?? const <Team>[])
-        .where((Team t) => t.id == widget.match.myTeamId)
+        .where((Team t) => t.id == widget.myTeamId)
         .firstOrNull;
     if (team == null) return;
     await Navigator.of(context).push(
       MaterialPageRoute<bool>(
-        builder: (_) => TeamFormScreen.editRoster(team: team, players: roster),
+        builder: (_) => TeamFormScreen.editRoster(team: team),
       ),
     );
   }
@@ -74,11 +90,11 @@ class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final int size = widget.match.teamSize ?? 0;
+    final int size = widget.teamSize;
     final AsyncValue<List<TeamPlayer>> rosterAsync =
-        ref.watch(teamRosterProvider(widget.match.myTeamId));
+        ref.watch(teamRosterProvider(widget.myTeamId));
     final AsyncValue<MatchDetail?> detailAsync =
-        ref.watch(matchDetailProvider(widget.match.id));
+        ref.watch(matchDetailProvider(widget.matchId));
 
     return Scaffold(
       appBar: AppBar(title: Text('Maç Kadrosu · ${size}v$size')),
@@ -105,7 +121,7 @@ class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: <Widget>[
                       Text(
-                        '${widget.match.opponentTeamName} maçına çıkacak $size oyuncuyu seç.',
+                        '${widget.opponentName} maçına çıkacak $size oyuncuyu seç.',
                         style: theme.textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 4),
@@ -154,7 +170,7 @@ class _LineupPickerScreenState extends ConsumerState<LineupPickerScreen> {
                           ),
                         ),
                       TextButton.icon(
-                        onPressed: _isBusy ? null : () => _editRoster(roster),
+                        onPressed: _isBusy ? null : _editRoster,
                         icon: const Icon(Icons.group_add_outlined),
                         label: const Text('Kadroya oyuncu ekle / düzenle'),
                       ),

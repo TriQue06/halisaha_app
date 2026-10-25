@@ -58,8 +58,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       context: context,
       initialDate: _birthDate ?? DateTime(now.year - 25, now.month, now.day),
       firstDate: DateTime(now.year - 90),
-      // En az 13 yaşında olmalı.
-      lastDate: DateTime(now.year - 13, now.month, now.day),
+      // Kullanım koşullarıyla aynı kural: 18 yaş ve üzeri.
+      lastDate: DateTime(now.year - 18, now.month, now.day),
       locale: const Locale('tr', 'TR'),
       helpText: 'Doğum tarihini seç',
     );
@@ -69,10 +69,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_birthDate == null) {
-      setState(() => _error = 'Doğum tarihini seç.');
-      return;
-    }
     if (!_acceptedTerms) {
       setState(() => _error = 'Devam etmek için koşulları kabul etmelisin.');
       return;
@@ -90,7 +86,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 password: _passwordController.text,
                 firstName: _firstNameController.text,
                 lastName: _lastNameController.text,
-                birthDate: _birthDate!,
+                birthDate: _birthDate,
               );
 
       if (!mounted) return;
@@ -173,9 +169,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 borderRadius: BorderRadius.circular(16),
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    labelText: 'Doğum tarihi',
+                    labelText: 'Doğum tarihi (isteğe bağlı)',
+                    helperText: 'Kaleci profilinde yaşın görünür; başka amaçla kullanılmaz.',
                     prefixIcon: const Icon(Icons.cake_outlined),
-                    errorText: _error == 'Doğum tarihini seç.' ? _error : null,
                   ),
                   child: Text(
                     _birthDate == null

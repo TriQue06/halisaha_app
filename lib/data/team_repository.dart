@@ -60,9 +60,20 @@ class TeamRepository {
         .select()
         .eq('team_id', teamId)
         .eq('is_active', true)
-        .order('first_name')
-        .order('last_name');
+        .order('display_name');
     return rows.map(TeamPlayer.fromRow).toList(growable: false);
+  }
+
+  /// Kadronun tam adları; yalnızca takımın kaptanı alabilir (kadro
+  /// düzenleme ekranı). Başkaları oyuncuları "Ahmet Y." biçiminde görür.
+  Future<List<RosterMember>> fetchRosterFull(String teamId) async {
+    final List<dynamic> rows = await _client.rpc<List<dynamic>>(
+      'get_team_roster_full',
+      params: <String, dynamic>{'p_team_id': teamId},
+    );
+    return rows
+        .map((dynamic r) => RosterMember.fromRow(r as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   /// Herhangi bir takımın tamamlanmış maçları (skorlu).
@@ -150,7 +161,7 @@ class TeamRepository {
           challenger:teams!matches_challenger_team_id_fkey(id, name, captain_id),
           opponent:teams!matches_opponent_team_id_fkey(id, name, captain_id),
           pitch:pitches(name),
-          lineups:match_lineups(team_id, player_id, first_name, last_name, slot, goals, assists)
+          lineups:match_lineups(team_id, player_id, display_name, slot, goals, assists)
         ''')
         .eq('id', matchId)
         .maybeSingle();

@@ -1,0 +1,12 @@
+{
+  "name": "japonkale-db-tests",
+  "private": true,
+  "description": "Tüm migration'ları Postgres (PGlite) üzerinde çalıştırıp yetki ve maç akışı senaryolarını test eder.",
+  "type": "module",
+  "scripts": {
+    "test": "node run.mjs ../.. tests.sql"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11"
+  }
+}

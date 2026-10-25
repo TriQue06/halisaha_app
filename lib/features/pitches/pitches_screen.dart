@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/izmir_districts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/match_errors.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
@@ -14,6 +16,11 @@ class PitchesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Pitch>> pitches = ref.watch(filteredPitchesProvider);
+    final String? district = ref.watch(pitchDistrictFilterProvider);
+    // Filtre çipleri yalnızca sahası olan ilçeler için.
+    final List<String> districts = IzmirDistricts.sorted(<String>{
+      for (final Pitch p in ref.watch(pitchesProvider).valueOrNull ?? const <Pitch>[]) p.district,
+    });
 
     Future<void> refresh() async {
       ref.invalidate(pitchesProvider);
@@ -24,13 +31,37 @@ class PitchesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Halı Sahalar'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: _PitchSearchField(
-              onChanged: (String value) =>
-                  ref.read(pitchSearchQueryProvider.notifier).state = value,
-            ),
+          preferredSize: Size.fromHeight(districts.length > 1 ? 112 : 64),
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: _PitchSearchField(
+                  onChanged: (String value) =>
+                      ref.read(pitchSearchQueryProvider.notifier).state = value,
+                ),
+              ),
+              if (districts.length > 1)
+                SizedBox(
+                  height: 48,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    children: <Widget>[
+                      for (final String? d in <String?>[null, ...districts])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(d ?? 'Tümü'),
+                            selected: district == d,
+                            onSelected: (_) =>
+                                ref.read(pitchDistrictFilterProvider.notifier).state = d,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -45,7 +76,7 @@ class PitchesScreen extends ConsumerWidget {
               EmptyState(
                 icon: Icons.cloud_off_rounded,
                 title: 'Sahalar yüklenemedi',
-                message: error.toString(),
+                message: turkishMatchError(error),
                 action: FilledButton.icon(
                   onPressed: refresh,
                   icon: const Icon(Icons.refresh_rounded, size: 18),

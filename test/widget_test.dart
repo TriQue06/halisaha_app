@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:japonkale/core/constants/izmir_districts.dart';
+import 'package:japonkale/core/services/push_service.dart';
+import 'package:japonkale/core/utils/match_errors.dart';
 import 'package:japonkale/features/auth/widgets/auth_widgets.dart';
+import 'package:japonkale/features/home/widgets/todo_section.dart';
 import 'package:japonkale/features/shell/main_shell.dart';
 import 'package:japonkale/models/models.dart';
 import 'package:japonkale/state/app_providers.dart';
 import 'package:japonkale/state/auth_controller.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 PendingMatch _match({
   required MatchStatus status,
@@ -276,6 +280,94 @@ void main() {
     });
   });
 
+  group('Maç adımları', () {
+    test('teklif sahibi skoru maçtan 1 saat sonra, rakip 25 saat sonra girer', () {
+      final DateTime twoHoursAgo = DateTime.now().subtract(const Duration(hours: 2));
+      expect(_match(status: MatchStatus.scheduled, matchDate: twoHoursAgo).canReportScore, isTrue);
+      expect(
+        _match(status: MatchStatus.scheduled, matchDate: twoHoursAgo, isChallenger: false)
+            .canReportScore,
+        isFalse,
+        reason: 'Rakip kaptan önce 24 saat bekler',
+      );
+      expect(
+        _match(
+          status: MatchStatus.scheduled,
+          matchDate: DateTime.now().subtract(const Duration(hours: 26)),
+          isChallenger: false,
+        ).canReportScore,
+        isTrue,
+      );
+    });
+
+    test('kabul edilmiş ve sonuçlanmamış maç iptal edilebilir', () {
+      expect(_match(status: MatchStatus.pending).canCancel, isFalse,
+          reason: 'Teklif aşaması Reddet / Geri Çek ile yönetiliyor');
+      expect(_match(status: MatchStatus.accepted).canCancel, isTrue);
+      expect(_match(status: MatchStatus.scheduled).canCancel, isTrue);
+      expect(_match(status: MatchStatus.completed).canCancel, isFalse);
+    });
+
+    test('Yapılacaklar yalnızca kullanıcıdan adım bekleyen maçları gösterir', () {
+      expect(
+        TodoSection.actionFor(_match(status: MatchStatus.pending, isChallenger: false)),
+        isNotNull,
+        reason: 'Gelen teklif yanıt bekliyor',
+      );
+      expect(TodoSection.actionFor(_match(status: MatchStatus.pending)), isNull,
+          reason: 'Gönderdiğimiz teklif için yapacak bir şey yok');
+      expect(
+        TodoSection.actionFor(_match(
+          status: MatchStatus.accepted,
+          acceptedAt: DateTime.now(),
+          myTeamReady: true,
+        )),
+        isNull,
+        reason: 'Hazırım dedik, rakibi bekliyoruz',
+      );
+      expect(
+        TodoSection.actionFor(_match(
+          status: MatchStatus.scheduled,
+          matchDate: DateTime.now().subtract(const Duration(hours: 3)),
+        )),
+        isNotNull,
+        reason: 'Skor girilmeli',
+      );
+    });
+  });
+
+  group('Bildirim yönlendirme', () {
+    test('yerel bildirim yükü tip ve maç id olarak çözülür', () {
+      final NotificationTap tap = NotificationTap.fromPayload('match_completed|m-42');
+      expect(tap.type, 'match_completed');
+      expect(tap.matchId, 'm-42');
+      final NotificationTap empty = NotificationTap.fromPayload(null);
+      expect(empty.type, isNull);
+      expect(empty.matchId, isNull);
+    });
+  });
+
+  group('Hata metinleri', () {
+    test('İngilizce teknik veritabanı hatası kullanıcıya gösterilmez', () {
+      final String text = turkishMatchError(
+        const PostgrestException(message: 'permission denied for table teams', code: '42501x'),
+      );
+      expect(text, isNot(contains('permission')));
+    });
+
+    test('sunucunun Türkçe kural mesajları anlaşılır metne çevrilir', () {
+      expect(
+        turkishMatchError(const PostgrestException(message: 'Uygunsuz ifade iceriyor; lutfen duzeltin')),
+        contains('uygunsuz'),
+      );
+      expect(
+        turkishMatchError(const PostgrestException(
+            message: 'Skoru once teklifi gonderen takim girer; 24 saat icinde girmezse sen girebilirsin')),
+        contains('24 saat'),
+      );
+    });
+  });
+
   testWidgets('Ana kabuk açılır ve 5 sekme görünür', (WidgetTester tester) async {
     // JaponKaleApp yerine doğrudan MainShell'i çalıştırıyoruz: JaponKaleApp
     // artık AuthGate üzerinden Supabase.instance'a bağlı ve widget testinde
@@ -314,9 +406,9 @@ void main() {
     expect(find.text('Japon Kale'), findsOneWidget);
     expect(find.text('Ana Sayfa'), findsOneWidget);
     expect(find.text('Sahalar'), findsOneWidget);
-    expect(find.text('Kaleciler'), findsOneWidget);
-    expect(find.text('Profilim'), findsOneWidget);
-    expect(find.text('Ayarlar'), findsOneWidget);
+    expect(find.text('Maçlar'), findsWidgets);
+    expect(find.text('Kaleciler'), findsWidgets);
+    expect(find.text('Profil'), findsOneWidget);
     expect(find.text('En Popüler Sahalar'), findsOneWidget);
     expect(find.text('Kaleci Profili Oluştur'), findsOneWidget);
   });

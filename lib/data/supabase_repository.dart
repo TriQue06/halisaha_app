@@ -223,8 +223,10 @@ class SupabaseRepository {
     final String? uid = _client.auth.currentUser?.id;
     if (uid == null) return const <Team>[];
 
+    // `teams` tablosundan `select *` yapılamaz (iletişim numarası kolonu
+    // yalnızca sunucu tarafında okunabiliyor); istatistik view'ı yeterli.
     final List<Map<String, dynamic>> rows =
-        await _client.from('teams').select().eq('captain_id', uid);
+        await _client.from('teams_with_stats').select().eq('captain_id', uid);
 
     return rows.map(teamFromRow).toList(growable: false);
   }
@@ -242,11 +244,11 @@ class SupabaseRepository {
     match_date, challenger_team_id, opponent_team_id, team_size,
     lineups:match_lineups(team_id),
     challenger:teams!matches_challenger_team_id_fkey(
-      id, name, contact_phone, captain_id,
+      id, name, captain_id,
       captain:profiles!teams_captain_id_fkey(first_name, last_name)
     ),
     opponent:teams!matches_opponent_team_id_fkey(
-      id, name, contact_phone, captain_id,
+      id, name, captain_id,
       captain:profiles!teams_captain_id_fkey(first_name, last_name)
     ),
     pitch:pitches(name)
@@ -270,9 +272,30 @@ class SupabaseRepository {
         .inFilter('status', <String>['pending', 'accepted', 'mutually_agreed', 'scheduled'])
         .order('created_at', ascending: false);
 
-    return rows
+    final List<PendingMatch> matches = rows
         .map((Map<String, dynamic> row) => _pendingMatchFromRow(row, myTeamIds))
-        .toList(growable: false);
+        .toList();
+
+    // Rakibin numarası yalnızca iki taraf da "Maça Hazırım" dedikten sonra
+    // ve yalnızca sunucudan (get_opponent_contact) gelir; liste sorgusunda
+    // hiç yok. Bir numara alınamazsa kart yine gösterilsin.
+    return Future.wait(matches.map((PendingMatch m) async {
+      if (!m.isContactVisible) return m;
+      try {
+        final List<dynamic> contact = await _client.rpc<List<dynamic>>(
+          'get_opponent_contact',
+          params: <String, dynamic>{'p_match_id': m.id},
+        );
+        if (contact.isEmpty) return m;
+        final Map<String, dynamic> c = contact.first as Map<String, dynamic>;
+        return m.copyWith(
+          opponentPhone: (c['contact_phone'] as String?) ?? '',
+          opponentCaptainName: c['captain_name'] as String?,
+        );
+      } catch (_) {
+        return m;
+      }
+    }));
   }
 
   /// Tamamlanmış maçlar, en yeniden eskiye.
@@ -442,7 +465,7 @@ class SupabaseRepository {
               : row['challenger_team_id']) as String? ??
           '',
       opponentCaptainId: (other?['captain_id'] as String?) ?? '',
-      opponentPhone: (other?['contact_phone'] as String?) ?? '',
+      opponentPhone: '',
       opponentCaptainName: captainName.isEmpty ? 'Takım kaptanı' : captainName,
       pitchName: ((row['pitch'] as Map<String, dynamic>?)?['name'] as String?) ?? '—',
       status: switch (row['status'] as String?) {
@@ -474,7 +497,6 @@ class SupabaseRepository {
       pitchId: row['pitch_id'] as String,
       captainId: row['captain_id'] as String,
       name: (row['name'] as String?) ?? '',
-      contactPhone: (row['contact_phone'] as String?) ?? '',
       wins: (row['wins'] as num?)?.toInt() ?? 0,
       draws: (row['draws'] as num?)?.toInt() ?? 0,
       losses: (row['losses'] as num?)?.toInt() ?? 0,

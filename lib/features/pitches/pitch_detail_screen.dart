@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/link_launcher.dart';
 import '../../core/utils/match_errors.dart';
 import '../../core/utils/phone_launcher.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -49,9 +50,21 @@ class PitchDetailScreen extends ConsumerWidget {
               ? EmptyState(
                   icon: Icons.cloud_off_rounded,
                   title: 'Saha bilgisi yüklenemedi',
-                  message: pitchAsync.error.toString(),
+                  message: turkishMatchError(pitchAsync.error!),
+                  action: OutlinedButton(
+                    onPressed: () => ref.invalidate(pitchesProvider),
+                    child: const Text('Tekrar dene'),
+                  ),
                 )
-              : const CircularProgressIndicator(),
+              // Liste geldi ama saha yok (kaldırılmış): sonsuza dek yükleme
+              // göstergesi yerine açıkça söyle.
+              : pitchAsync.hasValue
+                  ? const EmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'Saha bulunamadı',
+                      message: 'Bu saha artık listede değil.',
+                    )
+                  : const CircularProgressIndicator(),
         ),
       );
     }
@@ -79,7 +92,14 @@ class PitchDetailScreen extends ConsumerWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: <Widget>[
-                  const PitchImagePlaceholder(iconSize: 64),
+                  if (pitch.imageUrl != null && pitch.imageUrl!.isNotEmpty)
+                    Image.network(
+                      pitch.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const PitchImagePlaceholder(iconSize: 64),
+                    )
+                  else
+                    const PitchImagePlaceholder(iconSize: 64),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -129,7 +149,28 @@ class PitchDetailScreen extends ConsumerWidget {
               icon: Icons.shield_moon_rounded,
             ),
           ),
-          if (teams.isEmpty)
+          if (teamsAsync.isLoading && !teamsAsync.hasValue)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            )
+          else if (teamsAsync.hasError && !teamsAsync.hasValue)
+            // Bağlantı hatası "bu sahada takım yok" gibi gösterilmez.
+            SliverToBoxAdapter(
+              child: EmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: 'Takımlar yüklenemedi',
+                message: turkishMatchError(teamsAsync.error!),
+                compact: true,
+                action: OutlinedButton(
+                  onPressed: () => ref.invalidate(teamsForPitchProvider(pitchId)),
+                  child: const Text('Tekrar dene'),
+                ),
+              ),
+            )
+          else if (teams.isEmpty)
             const SliverToBoxAdapter(
               child: EmptyState(
                 icon: Icons.groups_outlined,
@@ -284,11 +325,31 @@ class _PitchInfoSection extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => PhoneLauncher.call(context, pitch.phone),
-            icon: const Icon(Icons.phone_outlined, size: 18),
-            label: Text('Sahayı Ara · ${pitch.phone}'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => PhoneLauncher.call(context, pitch.phone),
+                  icon: const Icon(Icons.phone_outlined, size: 18),
+                  label: const Text('Sahayı Ara'),
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  // Harita uygulamasında saha adı + adresle arama.
+                  onPressed: () => openExternalLink(
+                    context,
+                    'https://www.google.com/maps/search/?api=1&query='
+                    '${Uri.encodeComponent('${pitch.name}, ${pitch.address}, ${pitch.district}, İzmir')}',
+                  ),
+                  icon: const Icon(Icons.directions_outlined, size: 18),
+                  label: const Text('Yol Tarifi'),
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+                ),
+              ),
+            ],
           ),
         ],
       ),

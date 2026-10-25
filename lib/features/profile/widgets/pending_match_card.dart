@@ -34,6 +34,8 @@ class PendingMatchCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Süreye bağlı aşamalar (geri sayım, sonuç eşiği) dakikada bir tazelenir.
+    ref.watch(minuteTickProvider);
 
     return Card(
       child: Padding(
@@ -55,10 +57,76 @@ class PendingMatchCard extends ConsumerWidget {
 
             // Aşamaya özel aksiyon alanı
             _StageActions(match: match),
+
+            // Kabul edilmiş maçtan çıkış yolu (önceden yalnızca sunucuda vardı).
+            if (match.canCancel && match.stage != PendingMatchStage.expired)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _confirmCancel(context, ref, match),
+                  icon: const Icon(Icons.event_busy_rounded, size: 18),
+                  label: Text(
+                    match.stage == PendingMatchStage.awaitingResult
+                        ? 'Maç oynanmadı'
+                        : 'Maçı iptal et',
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.loss),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// İptal onayı; sebep rakibe bildirimde gösterilir.
+Future<void> _confirmCancel(BuildContext context, WidgetRef ref, PendingMatch match) async {
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  final TextEditingController reason = TextEditingController();
+
+  final bool? ok = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext dialogContext) => AlertDialog(
+      title: const Text('Maçı iptal et'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('${match.opponentTeamName} ile maç iptal edilecek ve rakibe bildirilecek.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: reason,
+            maxLength: 200,
+            decoration: const InputDecoration(labelText: 'Sebep (isteğe bağlı)'),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.loss),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('İptal Et'),
+        ),
+      ],
+    ),
+  );
+  final String text = reason.text.trim();
+  reason.dispose();
+  if (ok != true) return;
+
+  try {
+    await ref.read(matchActionsProvider).cancel(
+          match.id,
+          reason: text.isEmpty ? 'Maç iptal edildi' : text,
+        );
+    messenger.showSnackBar(const SnackBar(content: Text('Maç iptal edildi.')));
+  } catch (error) {
+    messenger.showSnackBar(SnackBar(content: Text(turkishMatchError(error))));
   }
 }
 
@@ -423,8 +491,13 @@ class _StageActions extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            if (match.isChallenger) ...<Widget>[
-              const _HintText('Maç bitti. Skoru ve oyuncularınızın gol/asistlerini girin.'),
+            if (match.canReportScore) ...<Widget>[
+              _HintText(
+                match.isChallenger
+                    ? 'Maç bitti. Skoru ve oyuncularınızın gol/asistlerini girin.'
+                    : '${match.opponentTeamName} skoru 24 saat içinde girmedi; '
+                        'skoru siz girebilirsiniz.',
+              ),
               const SizedBox(height: 10),
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).push(
@@ -442,8 +515,9 @@ class _StageActions extends ConsumerWidget {
               ),
             ] else
               _HintText(
-                'Maç tamamlandı. Skoru ${match.opponentTeamName} girecek; sonra '
-                'Maç Geçmişi\'nden kendi oyuncularınızın gol/asistlerini girebilirsiniz.',
+                'Maç tamamlandı. Skoru ${match.opponentTeamName} girecek; 24 saat '
+                'içinde girmezse siz girebilirsiniz. Sonra Maç Geçmişi\'nden kendi '
+                'oyuncularınızın gol/asistlerini girersiniz.',
               ),
             const SizedBox(height: 10),
             // Maçtan önce unutulduysa kadro hâlâ seçilebilir.
@@ -669,7 +743,7 @@ class _LineupBlock extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => LineupPickerScreen(match: match)),
+              MaterialPageRoute<void>(builder: (_) => LineupPickerScreen.forMatch(match)),
             ),
             child: Text(complete ? 'Düzenle' : 'Kadroyu Seç'),
           ),

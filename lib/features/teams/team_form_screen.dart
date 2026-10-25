@@ -12,19 +12,17 @@ import 'widgets/roster_editor.dart';
 class TeamFormScreen extends ConsumerStatefulWidget {
   /// Bu sahaya yeni takım.
   const TeamFormScreen.create({super.key, required Pitch this.pitch})
-      : team = null,
-        players = const <TeamPlayer>[];
+      : team = null;
 
-  /// Var olan takımın kadrosu.
+  /// Var olan takımın kadrosu. Tam adlar (soyad dahil) yalnızca kaptana
+  /// açık olduğu için ekran kadroyu kendisi yükler.
   const TeamFormScreen.editRoster({
     super.key,
     required Team this.team,
-    required this.players,
   }) : pitch = null;
 
   final Pitch? pitch;
   final Team? team;
-  final List<TeamPlayer> players;
 
   bool get isCreate => team == null;
 
@@ -35,8 +33,45 @@ class TeamFormScreen extends ConsumerStatefulWidget {
 class _TeamFormScreenState extends ConsumerState<TeamFormScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _name = TextEditingController();
-  late final RosterController _roster = RosterController(widget.players);
+  RosterController _roster = RosterController();
   bool _isBusy = false;
+
+  /// Düzenlemede kadro sunucudan gelene kadar form gösterilmez.
+  bool _isLoading = false;
+  String? _loadError;
+
+  /// Kayıtlı olmayan kişilerin adları başkalarına görünüyor; kaptandan
+  /// bunun için onay aldığını teyit etmesi isteniyor (App Store 5.1).
+  bool _consent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.isCreate) _loadRoster();
+  }
+
+  Future<void> _loadRoster() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final List<RosterMember> members =
+          await ref.read(teamRepositoryProvider).fetchRosterFull(widget.team!.id);
+      if (!mounted) return;
+      _roster.dispose();
+      setState(() {
+        _roster = RosterController(members);
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = turkishMatchError(error);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -79,7 +114,28 @@ class _TeamFormScreenState extends ConsumerState<TeamFormScreen> {
     final ThemeData theme = Theme.of(context);
     // Numara olmadan takım kurulamaz (veritabanı da reddediyor).
     final bool hasPhone = (ref.watch(currentUserProvider)?.phone ?? '').isNotEmpty;
-    final bool canSubmit = !_isBusy && (!widget.isCreate || hasPhone);
+    final bool canSubmit = !_isBusy && _consent && (!widget.isCreate || hasPhone);
+
+    if (_isLoading || _loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Kadroyu Düzenle')),
+        body: Center(
+          child: _isLoading
+              ? const CircularProgressIndicator()
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(_loadError!, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      OutlinedButton(onPressed: _loadRoster, child: const Text('Tekrar dene')),
+                    ],
+                  ),
+                ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -130,15 +186,29 @@ class _TeamFormScreenState extends ConsumerState<TeamFormScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Oyuncuların uygulamaya kayıtlı olması gerekmez; misafir '
-              'oyuncuları da ekleyebilirsin. Çıkardığın oyuncunun geçmiş '
-              'istatistikleri silinmez.',
+              'Oyuncuların uygulamaya kayıtlı olması gerekmez; takma ad da '
+              'kullanabilirsin. Diğer kullanıcılar oyuncuları "Ahmet Y." '
+              'biçiminde görür; soyadın tamamını yalnızca sen görürsün. '
+              'Çıkardığın oyuncunun geçmiş istatistikleri silinmez.',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             RosterEditor(controller: _roster),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            CheckboxListTile(
+              value: _consent,
+              onChanged: _isBusy ? null : (bool? v) => setState(() => _consent = v ?? false),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text(
+                'Kadroya eklediğim kişilerin adlarının ve maç istatistiklerinin '
+                'uygulamada görünmesi için onaylarını aldım. Biri isterse onu '
+                'kadrodan çıkaracağım.',
+              ),
+            ),
+            const SizedBox(height: 12),
             FilledButton(
               onPressed: canSubmit ? _submit : null,
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),

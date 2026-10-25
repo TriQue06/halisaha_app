@@ -51,14 +51,18 @@ class GoalkeeperCard extends StatelessWidget {
                                   ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '· ${goalkeeper.age}',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
+                          // Doğum tarihi isteğe bağlı; bilinmiyorsa yaş yazılmaz
+                          // ("0" görünüyordu).
+                          if (goalkeeper.age > 0) ...<Widget>[
+                            const SizedBox(width: 6),
+                            Text(
+                              '· ${goalkeeper.age}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 4),

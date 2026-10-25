@@ -54,6 +54,28 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await initializeFirebase();
 }
 
+/// Dokunulan bildirimin yönlendirme bilgisi (FCM `data` alanından).
+class NotificationTap {
+  const NotificationTap({this.matchId, this.type});
+
+  factory NotificationTap.fromData(Map<String, dynamic> data) => NotificationTap(
+        matchId: data['match_id'] as String?,
+        type: data['type'] as String?,
+      );
+
+  /// Yerel bildirim yükü: "tip|maç_id".
+  factory NotificationTap.fromPayload(String? payload) {
+    final List<String> parts = (payload ?? '').split('|');
+    return NotificationTap(
+      type: parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : null,
+      matchId: parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null,
+    );
+  }
+
+  final String? matchId;
+  final String? type;
+}
+
 /// Push bildirimlerinin tek giriş noktası.
 ///
 /// Sorumlulukları:
@@ -70,8 +92,29 @@ class PushService {
   static bool _initialized = false;
   static String? _lastRegisteredToken;
 
-  /// Ön planda bildirime dokunulduğunda çağrılır (uygulama içi yönlendirme).
-  static void Function()? onNotificationTap;
+  /// Bildirime dokunulduğunda çağrılır (uygulama içi yönlendirme). Ana
+  /// ekran açılmadan gelen dokunuş [_pendingTap]'te bekletilir.
+  static void Function(NotificationTap tap)? onNotificationTap;
+  static NotificationTap? _pendingTap;
+
+  static void _dispatch(NotificationTap tap) {
+    final void Function(NotificationTap)? handler = onNotificationTap;
+    if (handler == null) {
+      _pendingTap = tap;
+    } else {
+      handler(tap);
+    }
+  }
+
+  /// Ana ekran hazır olunca bekleyen dokunuşu (ör. uygulama kapalıyken
+  /// bildirimden açıldıysa) işler.
+  static void consumePendingTap() {
+    final NotificationTap? tap = _pendingTap;
+    final void Function(NotificationTap)? handler = onNotificationTap;
+    if (tap == null || handler == null) return;
+    _pendingTap = null;
+    handler(tap);
+  }
 
   /// `main()` içinde, Supabase başlatıldıktan sonra bir kez çağrılır.
   ///
@@ -108,9 +151,13 @@ class PushService {
       FirebaseMessaging.instance.onTokenRefresh.listen(_saveToken);
 
       FirebaseMessaging.onMessage.listen(_showForeground);
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage _) {
-        onNotificationTap?.call();
+      // Uygulama arka plandayken dokunulan bildirim.
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        _dispatch(NotificationTap.fromData(message.data));
       });
+      // Uygulama tamamen kapalıyken dokunulan bildirim (ayrı bir API).
+      final RemoteMessage? initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) _dispatch(NotificationTap.fromData(initial.data));
     } catch (error, stack) {
       debugPrint('PushService başlatılamadı: $error\n$stack');
     }
@@ -186,8 +233,8 @@ class PushService {
 
     await _local.initialize(
       const InitializationSettings(android: android, iOS: ios),
-      onDidReceiveNotificationResponse: (NotificationResponse _) =>
-          onNotificationTap?.call(),
+      onDidReceiveNotificationResponse: (NotificationResponse response) =>
+          _dispatch(NotificationTap.fromPayload(response.payload)),
     );
 
     // Kanal önceden oluşturulmalı; yoksa Android 8+ bildirimi sessizce yutar.
@@ -222,6 +269,7 @@ class PushService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
+      payload: '${message.data['type'] ?? ''}|${message.data['match_id'] ?? ''}',
     );
   }
 }

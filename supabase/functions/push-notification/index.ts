@@ -4,6 +4,13 @@
 // `notifications` tablosuna satır eklendiğinde Database Webhook tarafından
 // çağrılır ve o kullanıcının kayıtlı cihazlarına FCM push'u gönderir.
 //
+// Güvenlik: istek gövdesindeki metin KULLANILMAZ. Gövdeden yalnızca
+// bildirim id'si alınır; başlık, metin ve alıcı veritabanındaki gerçek
+// satırdan okunur. Böylece fonksiyonu doğrudan çağıran biri herhangi bir
+// kullanıcıya istediği metni gönderemez; en fazla var olan, yeni bir
+// bildirimi yeniden tetikleyebilir (10 dakikadan eskiler reddedilir).
+// Kullanıcının bildirim tercihleri (profiles.notify_*) burada uygulanır.
+//
 // Gerekli secret'lar (Supabase → Edge Functions → Secrets):
 //   FIREBASE_PROJECT_ID       : japon-kale
 //   FIREBASE_CLIENT_EMAIL     : service account e-postası
@@ -129,14 +136,42 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ skipped: true }), { status: 200 });
     }
 
-    const row = payload.record;
-    if (!row) return new Response(JSON.stringify({ skipped: true }), { status: 200 });
+    const notificationId = payload.record?.id;
+    if (!notificationId || !/^[0-9a-f-]{36}$/i.test(notificationId)) {
+      return new Response(JSON.stringify({ skipped: true }), { status: 200 });
+    }
 
     // service_role: RLS'i aşarak alıcının token'larını okuyabilmek için.
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
+
+    // Gerçek satır veritabanından; gövdedeki içerik yok sayılır.
+    const { data: row, error: rowError } = await supabase
+      .from('notifications')
+      .select('id, user_id, type, title, body, match_id, created_at')
+      .eq('id', notificationId)
+      .maybeSingle<NotificationRow & { created_at: string }>();
+    if (rowError) throw rowError;
+    if (!row || Date.now() - new Date(row.created_at).getTime() > 10 * 60 * 1000) {
+      return new Response(JSON.stringify({ skipped: true, reason: 'bildirim yok/eski' }), {
+        status: 200,
+      });
+    }
+
+    // Kullanıcının tercihi: teklifler ve maç haberleri ayrı ayrı kapatılabilir.
+    const { data: prefs } = await supabase
+      .from('profiles')
+      .select('notify_challenges, notify_matches')
+      .eq('id', row.user_id)
+      .maybeSingle<{ notify_challenges: boolean; notify_matches: boolean }>();
+    const isChallenge = row.type === 'challenge_received';
+    const isMatch = row.type.startsWith('match_') || row.type.startsWith('challenge_');
+    if (prefs && ((isChallenge && prefs.notify_challenges === false) ||
+        (!isChallenge && isMatch && prefs.notify_matches === false))) {
+      return new Response(JSON.stringify({ sent: 0, reason: 'kullanıcı kapattı' }), { status: 200 });
+    }
 
     const { data: devices, error } = await supabase
       .from('device_tokens')

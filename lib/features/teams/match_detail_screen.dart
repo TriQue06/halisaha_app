@@ -4,9 +4,12 @@ import 'package:intl/intl.dart';
 
 import '../../core/utils/match_errors.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../data/moderation_repository.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
 import '../../state/team_providers.dart';
+import '../moderation/report_action_sheet.dart';
+import 'lineup_picker_screen.dart';
 import 'match_result_screen.dart';
 
 /// Maç detayı: skor ve iki takımın hangi kadroyla çıktığı (gol/asistlerle).
@@ -21,8 +24,28 @@ class MatchDetailScreen extends ConsumerWidget {
     final AsyncValue<MatchDetail?> async = ref.watch(matchDetailProvider(matchId));
     final String? me = ref.watch(currentUserIdProvider);
 
+    // Maçın tarafıysak rakip kaptanı (ör. yanlış girilen skor için)
+    // raporlayabilir ya da engelleyebiliriz.
+    final MatchDetail? loaded = async.valueOrNull;
+    final MatchSide? mySide = loaded?.sideOf(me);
+    final MatchSide? rival = mySide == null
+        ? null
+        : (loaded!.challenger.teamId == mySide.teamId ? loaded.opponent : loaded.challenger);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Maç Detayı')),
+      appBar: AppBar(
+        title: const Text('Maç Detayı'),
+        actions: <Widget>[
+          if (rival != null)
+            ModerationMenuButton(
+              userId: rival.captainId,
+              displayName: rival.teamName,
+              reportContext: ReportContext.match,
+              matchId: loaded!.id,
+              iconSize: 24,
+            ),
+        ],
+      ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object e, _) => Center(
@@ -40,6 +63,10 @@ class MatchDetailScreen extends ConsumerWidget {
           }
           final MatchSide? mine = d.sideOf(me);
           final bool canEditStats = mine != null && mine.lineup.isNotEmpty && d.areStatsEditable;
+          // Maça kadro seçmeden çıkan takım, gol/asist girebilmek için
+          // kadroyu sonradan (7 gün içinde) seçebilir.
+          final bool canPickLineup =
+              mine != null && mine.lineup.isEmpty && d.areStatsEditable && d.teamSize != null;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
@@ -96,6 +123,26 @@ class MatchDetailScreen extends ConsumerWidget {
                   ),
                   icon: const Icon(Icons.edit_note_rounded),
                   label: const Text('Gol ve asistleri düzenle'),
+                ),
+              ],
+              if (canPickLineup) ...<Widget>[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => LineupPickerScreen(
+                        matchId: d.id,
+                        myTeamId: mine.teamId,
+                        teamSize: d.teamSize!,
+                        opponentName: (d.challenger.teamId == mine.teamId
+                                ? d.opponent
+                                : d.challenger)
+                            .teamName,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.groups_outlined),
+                  label: const Text('Maç kadrosunu seç'),
                 ),
               ],
               const SizedBox(height: 8),

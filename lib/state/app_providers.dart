@@ -47,18 +47,24 @@ final Provider<AsyncValue<List<Pitch>>> popularPitchesProvider =
 /// Sahalar sekmesindeki arama metni.
 final StateProvider<String> pitchSearchQueryProvider = StateProvider<String>((Ref ref) => '');
 
+/// Sahalar sekmesinde seçili ilçe (null = tümü).
+final StateProvider<String?> pitchDistrictFilterProvider =
+    StateProvider<String?>((Ref ref) => null);
+
 /// Ada, ilçeye veya adrese göre filtrelenmiş saha listesi.
 final Provider<AsyncValue<List<Pitch>>> filteredPitchesProvider =
     Provider<AsyncValue<List<Pitch>>>((Ref ref) {
   final String query = ref.watch(pitchSearchQueryProvider).trim().toLowerCase();
+  final String? district = ref.watch(pitchDistrictFilterProvider);
 
   return ref.watch(pitchesProvider).whenData((List<Pitch> pitches) {
-    if (query.isEmpty) return pitches;
     return pitches
         .where((Pitch p) =>
-            p.name.toLowerCase().contains(query) ||
-            p.district.toLowerCase().contains(query) ||
-            p.address.toLowerCase().contains(query))
+            (district == null || p.district == district) &&
+            (query.isEmpty ||
+                p.name.toLowerCase().contains(query) ||
+                p.district.toLowerCase().contains(query) ||
+                p.address.toLowerCase().contains(query)))
         .toList(growable: false);
   });
 });
@@ -156,6 +162,10 @@ final Provider<AvatarActions> avatarActionsProvider =
 /// Kaleci sekmesinde seçili ilçe (null = tüm ilçeler).
 final StateProvider<String?> selectedDistrictProvider = StateProvider<String?>((Ref ref) => null);
 
+/// Kaleci listesinde yalnızca maç tekliflerine açık olanlar mı gösterilsin?
+final StateProvider<bool> onlyAvailableGoalkeepersProvider =
+    StateProvider<bool>((Ref ref) => false);
+
 /// Seçili ilçeye göre filtrelenmiş kaleciler (puanı yüksekten düşüğe).
 ///
 /// İlçe filtresi veritabanı tarafında uygulanır (`districts @> {ilçe}`).
@@ -217,6 +227,13 @@ final FutureProvider<List<PendingMatch>> pendingMatchesProvider =
   ref.watch(myTeamsProvider);
   return ref.watch(repositoryProvider).fetchPendingMatches();
 });
+
+/// Dakikada bir değer üretir. Süreye bağlı kart durumları (onay sayacı,
+/// "sonucu gir" eşiği) ekran açıkken de kendiliğinden güncellensin diye
+/// maç kartları bunu izler.
+final StreamProvider<DateTime> minuteTickProvider = StreamProvider<DateTime>(
+  (Ref ref) => Stream<DateTime>.periodic(const Duration(minutes: 1), (_) => DateTime.now()),
+);
 
 /// Tamamlanmış maçlar, en yeniden eskiye.
 final FutureProvider<List<MatchHistoryEntry>> matchHistoryProvider =
