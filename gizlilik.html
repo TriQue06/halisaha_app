@@ -48,7 +48,7 @@
 <header>
   <div class="wrap">
     <h1>Gizlilik Politikası</h1>
-    <p>Japon Kale · Son güncelleme: 19 Eylül 2026</p>
+    <p>Japon Kale · Son güncelleme: 25 Ekim 2026</p>
   </div>
 </header>
 <main>
@@ -67,7 +67,8 @@
   <h2>2. Topladığımız veriler</h2>
   <h3>Hesap bilgileri</h3>
   <ul>
-    <li>Ad, soyad, doğum tarihi (yaşının gösterilmesi için)</li>
+    <li>Ad, soyad</li>
+    <li>Doğum tarihi (isteğe bağlı; yalnızca kaleci profilinde yaşının gösterilmesi için)</li>
     <li>E-posta adresi ve şifre. Şifre açık metin olarak saklanmaz, yalnızca doğrulama için şifrelenmiş hâli tutulur.</li>
     <li>Google ile veya Apple ile giriş yaparsan bu hizmetlerin verdiği hesap kimliği, e-posta adresi ve (paylaşmayı seçersen) adın; Google hesabındaki profil fotoğrafı</li>
   </ul>
@@ -81,14 +82,25 @@
   <ul>
     <li>Oluşturduğun takımlar, gönderdiğin ve aldığın maç teklifleri, maç tarihleri ve sonuçları, galibiyet/beraberlik/mağlubiyet istatistikleri</li>
     <li>Kalecilere verdiğin ve aldığın puanlar</li>
-    <li>Sana gönderilen bildirimler</li>
+    <li>Sana gönderilen bildirimler ve bildirim tercihlerin</li>
+    <li>Kullanım koşullarını hangi sürümüyle ve ne zaman kabul ettiğin</li>
+  </ul>
+  <h3>Takım kadrosu ve maç istatistikleri</h3>
+  <ul>
+    <li>Takım kaptanının kadroya eklediği oyuncuların adı (ya da takma adı) ve isteğe bağlı soyadı. Bu kişilerin uygulamaya kayıtlı olması gerekmez.</li>
+    <li>Maçın kaç kişilik olduğu, maç kadroları, skor ve oyuncu başına gol/asist sayıları</li>
+  </ul>
+  <h3>Raporlar ve engellemeler</h3>
+  <ul>
+    <li>Bir kullanıcıyı raporladığında: kimi, hangi sebeple raporladığın, yazdığın açıklama ve varsa ilgili maç</li>
+    <li>Engellediğin kullanıcılar</li>
   </ul>
   <h3>Cihaz verileri</h3>
   <ul>
     <li>Bildirim gönderebilmek için cihazına özel bildirim anahtarı (push token) ve cihaz türü (Android/iOS)</li>
   </ul>
   <h3>Yalnızca cihazında kalan veriler</h3>
-  <p>Tema, yazı boyutu ve bildirim tercihlerin cihazında (web sürümünde tarayıcının yerel depolamasında) tutulur, bize gönderilmez.</p>
+  <p>Tema ve yazı boyutu tercihlerin cihazında (web sürümünde tarayıcının yerel depolamasında) tutulur, bize gönderilmez.</p>
   <p class="muted">Konum, rehber, mikrofon verisi ve reklam kimliği toplamıyoruz. Kamera ve galeri yalnızca profil fotoğrafı seçtiğin anda, senin seçtiğin fotoğraf için kullanılır.</p>
 </section>
 
@@ -99,7 +111,7 @@
     <li><strong>Uygulamanın temel işlevleri:</strong> takım kurma, maç teklifi gönderme ve kabul etme, maç tarihini ve sonucunu kaydetme, kaleci listeleme ve puanlama</li>
     <li><strong>Anlaşılan maçlarda tarafları buluşturmak:</strong> telefon numarasını ilgili kişilere göstermek</li>
     <li><strong>Bildirim göndermek:</strong> maç teklifleri, onaylar ve sonuç hatırlatmaları</li>
-    <li><strong>Güvenlik:</strong> kötüye kullanımı önlemek, hataları tespit etmek</li>
+    <li><strong>Güvenlik ve topluluk kuralları:</strong> raporları incelemek, uygunsuz içeriği kaldırmak, kuralları ihlal eden hesapları askıya almak, takım/oyuncu adlarında ve kaleci açıklamalarında uygunsuz ifadeleri otomatik olarak engellemek, kötüye kullanımı önlemek ve hataları tespit etmek</li>
   </ul>
   <p>Hukuki sebeplerimiz (KVKK m.5): hizmeti sunabilmek için sözleşmenin kurulması ve ifası; hukuki yükümlülüklerimiz; temel hak ve özgürlüklerine zarar vermemek kaydıyla meşru menfaatimiz.</p>
 </section>
@@ -110,13 +122,18 @@
   <div class="table">
   <table>
     <tr><th>Bilgi</th><th>Kimler görür</th></tr>
-    <tr><td>Ad, soyad, yaş, profil fotoğrafı</td><td>Giriş yapmış kullanıcılar (takım, maç ve kaleci ekranlarında)</td></tr>
-    <tr><td>Takımın, kayıtlı olduğu saha ve istatistikleri</td><td>Giriş yapmış kullanıcılar</td></tr>
+    <tr><td>Ad, soyad</td><td>Giriş yapmış kullanıcılar (takım, maç ve kaleci ekranlarında)</td></tr>
+    <tr><td>Yaş (doğum tarihini verdiysen)</td><td>Kaleci profili oluşturduysan giriş yapmış kullanıcılar</td></tr>
+    <tr><td>Profil fotoğrafı</td><td>Uygulamada giriş yapmış kullanıcılara gösterilir. Fotoğraf bir bağlantı (URL) üzerinden sunulduğu için bağlantıyı bilen biri uygulama dışında da açabilir; bu yüzden özel bulduğun bir fotoğrafı yükleme.</td></tr>
+    <tr><td>Takımın, kayıtlı olduğu saha, istatistikleri ve skorlu maç geçmişi</td><td>Giriş yapmış kullanıcılar</td></tr>
+    <tr><td>Kadrodaki oyuncular ve gol/asist istatistikleri</td><td>Giriş yapmış kullanıcılar oyuncuyu <strong>ad ve soyadın baş harfiyle</strong> görür (ör. "Ahmet Y."). Soyadın tamamını yalnızca takımın kaptanı görür.</td></tr>
     <tr><td>Kaleci profilin, puanın ve <strong>telefon numaran</strong></td><td>Kaleci profili oluşturduysan giriş yapmış kullanıcılar. Takımların seni arayabilmesi için numara kaleci profilinde görünür; kaleci profilini silerek bunu kaldırabilirsin.</td></tr>
-    <tr><td>Takım kaptanı olarak <strong>telefon numaran</strong></td><td>Maç teklifi kabul edildikten sonra, o maçtaki rakip takımın kaptanı; maçı ayarlayabilmeniz için</td></tr>
+    <tr><td>Takım kaptanı olarak <strong>telefon numaran</strong></td><td>Yalnızca iki takım da "Maça Hazırım" dedikten sonra, o maçtaki rakip takımın kaptanı; maçı ayarlayabilmeniz için</td></tr>
   </table>
   </div>
-  <p>Doğum tarihin ve e-posta adresin diğer kullanıcılara gösterilmez; yalnızca yaşın gösterilir.</p>
+  <p>Doğum tarihin, e-posta adresin, raporların ve engellediğin kişiler diğer kullanıcılara gösterilmez. Raporladığın kişiye kimin raporladığı söylenmez.</p>
+  <h3>Kadroya eklenen, uygulamayı kullanmayan kişiler</h3>
+  <p>Takım kaptanları kadroya uygulamaya kayıtlı olmayan kişileri de ekleyebilir. Kaptan, eklediği kişilerin adlarının ve maç istatistiklerinin uygulamada görünmesi için onlardan onay aldığını kabul eder; soyad yerine takma ad da kullanılabilir. Kadroda adının görünmesini istemiyorsan takımın kaptanından çıkarılmanı isteyebilir ya da <a href="mailto:omersarikan35@gmail.com">omersarikan35@gmail.com</a> adresine yazabilirsin; talebini en geç 30 gün içinde yerine getiririz.</p>
 </section>
 
 <section>
@@ -138,7 +155,8 @@
 
 <section>
   <h2>7. Saklama süresi ve silme</h2>
-  <p>Verilerini hesabın açık olduğu sürece saklarız. Hesabını sildiğinde profilin, telefon numaran, takımların, maç geçmişin, kaleci profilin, puanların, bildirimlerin ve profil fotoğrafın veritabanından kalıcı olarak silinir. Apple ile giriş yaptıysan Apple'daki uygulama yetkisi de iptal edilir.</p>
+  <p>Verilerini hesabın açık olduğu sürece saklarız. Hesabını sildiğinde profilin, telefon numaran, takımların ve kadroların, bu takımların oynadığı maç kayıtları, kaleci profilin, puanların, bildirimlerin, raporların, engellemelerin ve profil fotoğrafın kalıcı olarak silinir. Apple ile giriş yaptıysan Apple'daki uygulama yetkisi de iptal edilir.</p>
+  <p>Profil fotoğrafının silinmesi veya Apple yetkisinin iptali geçici bir arıza nedeniyle tamamlanamazsa hesabın yine silinir; kalan dosya hiçbir hesaba bağlı değildir ve talep etmen hâlinde elle temizlenir.</p>
   <p>Silinen veriler, hizmet sağlayıcıların teknik yedeklerinde ve güvenlik kayıtlarında sınırlı bir süre daha kalabilir; bu kayıtlar başka bir amaçla kullanılmaz.</p>
   <p class="note">Hesabını uygulamanın içinden silebilirsin. Uygulamaya erişemiyorsan: <a href="hesap-silme.html">Hesap silme talebi</a></p>
 </section>
