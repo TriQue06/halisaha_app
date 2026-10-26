@@ -44,7 +44,9 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
   }
 
   bool get _canDelete =>
-      !_isBusy && _controller.text.trim().toUpperCase() == _confirmWord;
+      !_isBusy &&
+      // İngilizce klavyede "İ" yazılamıyor; "SIL"/"sil" de kabul edilir.
+      _controller.text.trim().replaceAll('İ', 'I').replaceAll('ı', 'i').toUpperCase() == 'SIL';
 
   Future<void> _delete() async {
     setState(() {
@@ -55,7 +57,9 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
     try {
       await ref.read(authControllerProvider).deleteAccount();
       // Başarılı: oturum kapandı, AuthGate giriş ekranını gösterecek.
-      if (mounted) Navigator.of(context).pop();
+      // Ayarlar gibi üstte açık sayfalar kalmasın: giriş ekranına kadar
+      // her şeyi kapat (aksi hâlde kullanıcı Ayarlar'da takılı kalıyor).
+      if (mounted) Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
     } catch (error) {
       if (!mounted) return;
       setState(() {
