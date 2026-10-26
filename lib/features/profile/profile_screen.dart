@@ -202,7 +202,7 @@ class _ProfileHeader extends StatelessWidget {
                 Text(
                   user == null
                       ? 'Profil yükleniyor...'
-                      : (user.fullName.isNotEmpty ? user.fullName : 'Japon Kale oyuncusu'),
+                      : (user!.fullName.isNotEmpty ? user!.fullName : 'Japon Kale oyuncusu'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
