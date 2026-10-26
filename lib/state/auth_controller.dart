@@ -87,6 +87,19 @@ bool isProfileComplete(Map<String, dynamic>? profile) {
   return filled('first_name') && filled('last_name');
 }
 
+/// Hesap Apple ile mi açılmış/bağlanmış?
+///
+/// Apple adı yalnızca İLK yetkilendirmede veriyor. Aynı Apple kimliğiyle
+/// ikinci girişte (App Review cihazları dahil) ad gelmez; bu kullanıcıları
+/// ad ekranına zorlamak Guideline 4'ü ihlal ediyor. Bu yüzden Apple
+/// kullanıcıları için ad-soyad hiçbir zaman girişin önünü kesmez; eksikse
+/// profil sekmesindeki isteğe bağlı karttan eklenir.
+bool isAppleUser(User? user) {
+  final Object? providers = user?.appMetadata['providers'];
+  if (providers is List && providers.contains('apple')) return true;
+  return user?.appMetadata['provider'] == 'apple';
+}
+
 /// Kimlik doğrulama işlemleri.
 ///
 /// Üç yöntem: e-posta+şifre, telefon (SMS OTP) ve Google.
@@ -291,6 +304,17 @@ class AuthController {
     final String first = givenName?.trim() ?? '';
     final String last = familyName?.trim() ?? '';
     if (first.isEmpty && last.isEmpty) return;
+    // Kullanıcı metadata'sına da yaz: profil satırı sonradan yeniden
+    // oluşturulursa (get_my_profile) ad oradan alınır.
+    try {
+      await _auth.updateUser(UserAttributes(data: <String, dynamic>{
+        if (first.isNotEmpty) 'first_name': first,
+        if (last.isNotEmpty) 'last_name': last,
+        'full_name': '$first $last'.trim(),
+      }));
+    } catch (error) {
+      debugPrint('Apple adı metadata\'ya yazılamadı: $error');
+    }
     try {
       await _client
           .from('profiles')

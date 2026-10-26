@@ -109,8 +109,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
 
+    // Giriş başarılı olunca bu ekran ağaçtan kalkar ve `ref` kullanılamaz;
+    // container'ı ÖNCEDEN alıyoruz.
+    final ProviderContainer container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(authControllerProvider).signInWithApple();
+      // Oturum açılır açılmaz profil okunuyor; Apple'ın verdiği ad ondan
+      // SONRA yazıldığı için profili yeniden yükle (yoksa ad boş görünür).
+      container.invalidate(myProfileProvider);
     } catch (error) {
       _setError(error);
     } finally {

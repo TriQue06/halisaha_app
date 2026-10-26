@@ -52,7 +52,11 @@ class AuthGate extends ConsumerWidget {
         if (data != null) {
           TermsAcceptance.syncToServer(ref.read(supabaseProvider), data);
         }
-        if (!isProfileComplete(data)) return const CompleteProfileScreen();
+        // Apple ile girene ad-soyad ASLA sorulmaz (Guideline 4); eksikse
+        // profil sekmesindeki isteğe bağlı karttan eklenir.
+        if (!isProfileComplete(data) && !isAppleUser(session.user)) {
+          return const CompleteProfileScreen();
+        }
         return const MainShell();
       },
     );

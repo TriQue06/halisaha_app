@@ -61,7 +61,8 @@ class ProfileScreen extends ConsumerWidget {
             children: <Widget>[
               // Doğum tarihi ve telefon girişte zorunlu değil (Apple ile
               // girişte Apple bunları vermiyor); eksikse burada hatırlatılır.
-              if (user != null && (user.birthDate == null || user.phone.isEmpty))
+              if (user != null &&
+                  (user.fullName.isEmpty || user.birthDate == null || user.phone.isEmpty))
                 _CompleteProfileBanner(user: user),
               const Expanded(
                 child: TabBarView(
@@ -93,6 +94,7 @@ class _CompleteProfileBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final List<String> missing = <String>[
+      if (user.fullName.isEmpty) 'adın',
       if (user.birthDate == null) 'doğum tarihin',
       if (user.phone.isEmpty) 'telefon numaran',
     ];
@@ -198,7 +200,9 @@ class _ProfileHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  user?.fullName.isNotEmpty ?? false ? user!.fullName : 'Profil yükleniyor...',
+                  user == null
+                      ? 'Profil yükleniyor...'
+                      : (user.fullName.isNotEmpty ? user.fullName : 'Japon Kale oyuncusu'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

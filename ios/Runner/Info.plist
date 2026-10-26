@@ -72,7 +72,6 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
-		<string>fetch</string>
 	</array>
 	<!-- url_launcher ile telefon araması (tel:) için gerekli -->
 	<key>LSApplicationQueriesSchemes</key>
