@@ -1,5 +1,12 @@
 # =====================================================================
-# Codemagic — iOS derleme ve TestFlight yükleme
+# Codemagic — iOS (TestFlight) ve Android (Google Play .aab) derlemeleri
+#
+# ANDROID (android-release) için panelde bir kez yapılacak:
+#  Teams → Code signing identities → Android keystores → japonkale-upload.jks
+#  dosyasını yükle (alias: upload, parolalar key.properties'tekiyle aynı).
+#  "Reference name" alanına TAM OLARAK: japonkale_upload
+#  Sürüm kodu pubspec.yaml'daki "+N" kısmından gelir; her Play yüklemesinden
+#  önce artırılmalı (Play aynı sürüm kodunu ikinci kez kabul etmez).
 #
 # Mac gerekmez: Codemagic buluttaki Mac'te derler, imzalar ve yükler.
 #
@@ -89,3 +96,40 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  android-release:
+    name: Android → Google Play (.aab)
+    instance_type: linux_x2
+    max_build_duration: 45
+
+    environment:
+      flutter: 3.47.2
+      android_signing:
+        - japonkale_upload
+
+    scripts:
+      - name: Bağımlılıklar
+        script: flutter pub get
+
+      - name: Analiz ve testler
+        script: |
+          flutter analyze
+          flutter test
+
+      # build.gradle.kts imza bilgisini android/key.properties'ten okuyor.
+      # Dosya repoda yok (gizli); Codemagic'teki keystore'dan üretiyoruz.
+      - name: İmza bilgisi (key.properties)
+        script: |
+          cat > android/key.properties <<PROPS
+          storePassword=${CM_KEYSTORE_PASSWORD}
+          keyPassword=${CM_KEY_PASSWORD}
+          keyAlias=${CM_KEY_ALIAS}
+          storeFile=${CM_KEYSTORE_PATH}
+          PROPS
+
+      - name: App Bundle derle
+        script: flutter build appbundle --release
+
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/mapping/release/mapping.txt
