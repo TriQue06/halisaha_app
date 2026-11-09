@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -158,8 +159,44 @@ class PushService {
       // Uygulama tamamen kapalıyken dokunulan bildirim (ayrı bir API).
       final RemoteMessage? initial = await FirebaseMessaging.instance.getInitialMessage();
       if (initial != null) _dispatch(NotificationTap.fromData(initial.data));
+
+      // Uygulama arka plandan dönünce kaydı yeniden dene (iOS'ta APNs token'ı
+      // ilk açılışta geç gelebiliyor; kullanıcı izni sonradan da verebilir).
+      _lifecycle ??= AppLifecycleListener(onResume: syncToken);
     } catch (error, stack) {
       debugPrint('PushService başlatılamadı: $error\n$stack');
+      // Oturum henüz yoksa, açıldığında hatayı bildir.
+      if (Supabase.instance.client.auth.currentSession != null) {
+        _report('init_failed', '$error');
+      } else {
+        Supabase.instance.client.auth.onAuthStateChange.listen((AuthState state) {
+          if (state.session != null) _report('init_failed', '$error');
+        });
+      }
+    }
+  }
+
+  static AppLifecycleListener? _lifecycle;
+  static final Set<String> _reported = <String>{};
+
+  /// Push kaydının neden başarısız olduğunu Supabase'e yazar (teşhis için).
+  /// Aynı oturumda aynı aşama yalnızca bir kez yazılır. Asla hata fırlatmaz.
+  static Future<void> _report(String stage, [String? detail]) async {
+    if (!_reported.add(stage)) return;
+    if (Supabase.instance.client.auth.currentSession == null) return;
+    try {
+      await Supabase.instance.client.rpc<dynamic>(
+        'log_push_diagnostic',
+        params: <String, dynamic>{
+          'p_platform': Platform.isIOS ? 'ios' : 'android',
+          'p_stage': stage,
+          'p_detail': detail == null
+              ? null
+              : (detail.length > 500 ? detail.substring(0, 500) : detail),
+        },
+      );
+    } catch (_) {
+      // Teşhis kaydı da başarısız olursa yapacak bir şey yok.
     }
   }
 
@@ -172,20 +209,28 @@ class PushService {
       if (Platform.isIOS) {
         String? apns = await FirebaseMessaging.instance.getAPNSToken();
         // APNs kaydı birkaç saniye sürebiliyor; kısa aralıklarla tekrar dene.
-        for (int i = 0; apns == null && i < 5; i++) {
+        for (int i = 0; apns == null && i < 15; i++) {
           await Future<void>.delayed(const Duration(seconds: 1));
           apns = await FirebaseMessaging.instance.getAPNSToken();
         }
         if (apns == null) {
           debugPrint('APNs token alınamadı; push kaydı atlandı.');
+          final NotificationSettings settings =
+              await FirebaseMessaging.instance.getNotificationSettings();
+          await _report('apns_null', 'izin: ${settings.authorizationStatus.name}');
           return;
         }
       }
 
       final String? token = await FirebaseMessaging.instance.getToken();
-      if (token != null) await _saveToken(token);
+      if (token != null) {
+        await _saveToken(token);
+      } else {
+        await _report('fcm_token_null');
+      }
     } catch (error) {
       debugPrint('FCM token alınamadı: $error');
+      await _report('fcm_token_error', '$error');
     }
   }
 
@@ -221,8 +266,10 @@ class PushService {
         },
       );
       _lastRegisteredToken = token;
+      await _report('ok');
     } catch (error) {
       debugPrint('Token kaydedilemedi: $error');
+      await _report('save_failed', '$error');
     }
   }
 
