@@ -28,6 +28,15 @@ class AuthGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final Session? session = ref.watch(sessionProvider);
 
+    // Oturum kapanınca (çıkış ya da hesap silme) üstte açık kalan sayfaları
+    // (Ayarlar, Profilini tamamla vb.) kapat; yoksa kullanıcı giriş ekranı
+    // yerine o sayfada takılı kalıyor ve geri tuşuna basmak zorunda kalıyor.
+    ref.listen<Session?>(sessionProvider, (Session? previous, Session? next) {
+      if (previous != null && next == null) {
+        Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst);
+      }
+    });
+
     if (session == null) return const LoginScreen();
 
     final AsyncValue<Map<String, dynamic>?> profile = ref.watch(myProfileProvider);

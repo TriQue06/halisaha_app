@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/theme_selector.dart';
 
 /// Giriş/kayıt ekranlarının ortak yeşil gradyanlı üst başlığı.
 class AuthHeader extends StatelessWidget {
@@ -55,9 +54,6 @@ class AuthHeader extends StatelessWidget {
                   letterSpacing: -0.4,
                 ),
               ),
-              const Spacer(),
-              // Tema seçimi girişten önce de yapılabilsin.
-              const ThemeSelector(compact: true),
             ],
           ),
           const SizedBox(height: 20),

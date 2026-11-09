@@ -48,8 +48,25 @@ class ProfileScreen extends ConsumerWidget {
                   background: _ProfileHeader(user: user),
                   collapseMode: CollapseMode.pin,
                 ),
-                bottom: const TabBar(
-                  tabs: <Widget>[
+                // Açık modda sekmeler koyu yeşil başlığın üstünde duruyor;
+                // temanın yeşil/gri renkleri orada okunmuyor, beyaz kullan.
+                // Koyu modda tema renkleri (lime) zaten iyi görünüyor.
+                bottom: TabBar(
+                  labelColor: Theme.of(context).brightness == Brightness.light
+                      ? Colors.white
+                      : null,
+                  unselectedLabelColor: Theme.of(context).brightness == Brightness.light
+                      ? Colors.white70
+                      : null,
+                  indicatorColor: Theme.of(context).brightness == Brightness.light
+                      ? Colors.white
+                      : null,
+                  indicator: Theme.of(context).brightness == Brightness.light
+                      ? const UnderlineTabIndicator(
+                          borderSide: BorderSide(width: 3, color: Colors.white),
+                        )
+                      : null,
+                  tabs: const <Widget>[
                     Tab(text: 'Takımlarım'),
                     Tab(text: 'Kaleci Profilim'),
                   ],
@@ -99,8 +116,16 @@ class _CompleteProfileBanner extends StatelessWidget {
       if (user.phone.isEmpty) 'telefon numaran',
     ];
 
+    // Turuncu uyarı kutusu: göze çarpsın ama "hata" gibi görünmesin
+    // (bu bilgiler isteğe bağlı).
+    final bool isDark = theme.brightness == Brightness.dark;
+    final Color background = isDark ? const Color(0xFF3A2410) : const Color(0xFFFFF3E0);
+    final Color foreground = isDark ? const Color(0xFFFFB74D) : const Color(0xFFB45309);
+    final Color border = isDark ? const Color(0xFF8A4B12) : const Color(0xFFFFB74D);
+
     return Material(
-      color: theme.colorScheme.secondaryContainer,
+      color: background,
+      shape: Border(bottom: BorderSide(color: border), top: BorderSide(color: border)),
       child: InkWell(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const CompleteProfileScreen()),
@@ -109,20 +134,18 @@ class _CompleteProfileBanner extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
           child: Row(
             children: <Widget>[
-              Icon(Icons.info_outline_rounded,
-                  size: 20, color: theme.colorScheme.onSecondaryContainer),
+              Icon(Icons.warning_amber_rounded, size: 22, color: foreground),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Profilini tamamla: ${missing.join(' ve ')} eksik.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSecondaryContainer,
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: theme.colorScheme.onSecondaryContainer),
+              Icon(Icons.chevron_right_rounded, color: foreground),
             ],
           ),
         ),
