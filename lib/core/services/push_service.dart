@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -177,6 +178,7 @@ class PushService {
   }
 
   static AppLifecycleListener? _lifecycle;
+  static const MethodChannel _iosPushChannel = MethodChannel('japonkale/push');
   static final Set<String> _reported = <String>{};
 
   /// Push kaydının neden başarısız olduğunu Supabase'e yazar (teşhis için).
@@ -208,6 +210,15 @@ class PushService {
       // Bu beklenmezse getToken() null döner ve cihaz hiç kaydolmaz.
       if (Platform.isIOS) {
         String? apns = await FirebaseMessaging.instance.getAPNSToken();
+        if (apns == null) {
+          // Firebase artık hazır: iOS'tan APNs token'ını yeniden göndermesini
+          // iste (açılıştaki ilk teslim Firebase başlamadan önce kayboluyor).
+          try {
+            await _iosPushChannel.invokeMethod<void>('registerForRemoteNotifications');
+          } catch (_) {
+            // Eski derlemede kanal yoksa sessizce devam et.
+          }
+        }
         // APNs kaydı birkaç saniye sürebiliyor; kısa aralıklarla tekrar dene.
         for (int i = 0; apns == null && i < 15; i++) {
           await Future<void>.delayed(const Duration(seconds: 1));

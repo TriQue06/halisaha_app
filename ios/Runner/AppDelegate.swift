@@ -20,5 +20,26 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+
+    // Dart tarafı Firebase'i başlattıktan SONRA APNs kaydını yeniden ister.
+    // Açılıştaki ilk kayıtta token Firebase hazır olmadan gelip kayboluyordu
+    // (push_diagnostics: soğuk açılışta apns_null). iOS her
+    // registerForRemoteNotifications çağrısında token'ı yeniden teslim eder.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "JaponKalePush") {
+      let channel = FlutterMethodChannel(
+        name: "japonkale/push",
+        binaryMessenger: registrar.messenger()
+      )
+      channel.setMethodCallHandler { call, result in
+        if call.method == "registerForRemoteNotifications" {
+          DispatchQueue.main.async {
+            UIApplication.shared.registerForRemoteNotifications()
+          }
+          result(nil)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
   }
 }
