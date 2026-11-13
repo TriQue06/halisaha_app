@@ -643,9 +643,16 @@ class PendingMatch {
     return date == null || date.isAfter(DateTime.now());
   }
 
-  /// İletişim bilgisi yalnızca iki taraf da hazır olduğunda açılır.
+  /// Rakibin telefonu ne zaman görünür (sunucudaki get_opponent_contact ile
+  /// aynı kural):
+  /// * teklif bekliyorken yalnızca teklifi ALAN taraf, gönderenin numarasını
+  ///   görür (gün/saat konuşabilsin diye),
+  /// * kabulden sonra iki taraf da birbirini görür.
   bool get isContactVisible =>
-      status == MatchStatus.mutuallyAgreed || status == MatchStatus.scheduled;
+      (status == MatchStatus.pending && !isChallenger) ||
+      status == MatchStatus.accepted ||
+      status == MatchStatus.mutuallyAgreed ||
+      status == MatchStatus.scheduled;
 
   /// Kartın hangi aksiyonları göstereceğini belirleyen tek doğruluk kaynağı.
   PendingMatchStage get stage {

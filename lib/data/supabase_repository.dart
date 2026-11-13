@@ -276,9 +276,10 @@ class SupabaseRepository {
         .map((Map<String, dynamic> row) => _pendingMatchFromRow(row, myTeamIds))
         .toList();
 
-    // Rakibin numarası yalnızca iki taraf da "Maça Hazırım" dedikten sonra
-    // ve yalnızca sunucudan (get_opponent_contact) gelir; liste sorgusunda
-    // hiç yok. Bir numara alınamazsa kart yine gösterilsin.
+    // Rakibin numarası yalnızca sunucudan (get_opponent_contact) gelir;
+    // liste sorgusunda hiç yok. Teklif alan taraf gönderenin numarasını
+    // hemen, gönderen taraf rakibinkini kabulden sonra görür.
+    // Bir numara alınamazsa kart yine gösterilsin.
     return Future.wait(matches.map((PendingMatch m) async {
       if (!m.isContactVisible) return m;
       try {

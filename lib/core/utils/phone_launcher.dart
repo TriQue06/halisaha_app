@@ -56,4 +56,35 @@ abstract final class PhoneLauncher {
       );
     }
   }
+
+  /// WhatsApp sohbetini [rawNumber] ile açar (wa.me bağlantısı).
+  ///
+  /// Numara uluslararası biçimde olmalı (+90...). Başında 0 olan yerel
+  /// Türkiye numaraları 90 ile tamamlanır.
+  static Future<void> whatsApp(BuildContext context, String rawNumber) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    String digits = rawNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('0')) digits = '90${digits.substring(1)}';
+    if (digits.length < 10) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Geçerli bir telefon numarası yok.')),
+      );
+      return;
+    }
+    try {
+      final bool launched = await launchUrl(
+        Uri.parse('https://wa.me/$digits'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('WhatsApp açılamadı.')),
+        );
+      }
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('WhatsApp açılamadı.')),
+      );
+    }
+  }
 }

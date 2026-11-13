@@ -48,9 +48,9 @@ class PendingMatchCard extends ConsumerWidget {
             const Divider(height: 1),
             const SizedBox(height: 12),
 
-            // AŞAMA 3 & 4: İletişim bilgileri yalnızca iki taraf da
-            // "Maça Hazırım" dedikten sonra açılır.
-            if (match.isContactVisible) ...<Widget>[
+            // İletişim: teklif alan taraf gönderenin numarasını hemen,
+            // gönderen taraf rakibinkini kabulden sonra görür.
+            if (match.isContactVisible && match.opponentPhone.isNotEmpty) ...<Widget>[
               _ContactPanel(match: match),
               const SizedBox(height: 12),
             ],
@@ -262,7 +262,7 @@ class _StageBadge extends StatelessWidget {
 }
 
 // =====================================================================
-// AŞAMA 3: İletişim paneli (yalnızca karşılıklı onay sonrası)
+// İletişim paneli (teklif alındığında / kabulden sonra)
 // =====================================================================
 class _ContactPanel extends StatelessWidget {
   const _ContactPanel({required this.match});
@@ -302,6 +302,12 @@ class _ContactPanel extends StatelessWidget {
               ],
             ),
           ),
+          IconButton.filledTonal(
+            tooltip: 'WhatsApp',
+            onPressed: () => PhoneLauncher.whatsApp(context, match.opponentPhone),
+            icon: const Icon(Icons.chat_rounded, size: 18),
+          ),
+          const SizedBox(width: 6),
           FilledButton.icon(
             onPressed: () => PhoneLauncher.call(context, match.opponentPhone),
             icon: const Icon(Icons.phone_rounded, size: 16),

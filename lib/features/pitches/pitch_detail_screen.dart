@@ -236,8 +236,11 @@ class PitchDetailScreen extends ConsumerWidget {
         title: const Text('Maç Teklifi Gönder'),
         content: Text(
           '${opponent.name} takımına maç teklifi göndermek üzeresiniz.\n\n'
-          'Rakip kabul ederse maç "Bekleyen Maçlar" listenize düşecek ve '
-          'iki tarafın da 1 hafta içinde "Maça Hazırım" onayı vermesi gerekecek.',
+          'Gün ve saati konuşabilmeniz için takımınızın telefon numarası '
+          'rakip kaptana gösterilecek. Rakibin numarasını o teklifi '
+          'kabul edince görürsünüz.\n\n'
+          'Kabul edilirse iki tarafın da 1 hafta içinde "Maça Hazırım" '
+          'onayı vermesi gerekecek.',
         ),
         actions: <Widget>[
           TextButton(
