@@ -61,8 +61,22 @@ void main() {
         acceptedAt: DateTime.now().subtract(const Duration(days: 2)),
       );
       expect(match.stage, PendingMatchStage.readinessPending);
-      expect(match.isContactVisible, isFalse, reason: 'İletişim henüz açılmamalı');
+      // 1.0.5: kabulden sonra iki taraf da birbirinin numarasını görür.
+      expect(match.isContactVisible, isTrue, reason: 'Kabulden sonra iletişim açık');
       expect(match.timeLeftForReadiness.inDays, 4);
+    });
+
+    test('iletişim: teklif bekliyorken yalnızca teklifi ALAN taraf görür', () {
+      expect(
+        _match(status: MatchStatus.pending, isChallenger: false).isContactVisible,
+        isTrue,
+        reason: 'Teklif alan, gönderenin numarasını hemen görmeli',
+      );
+      expect(
+        _match(status: MatchStatus.pending).isContactVisible,
+        isFalse,
+        reason: 'Teklif gönderen, rakibin numarasını kabulden önce görmemeli',
+      );
     });
 
     test('2. aşama: 1 hafta dolduysa süresi dolmuş sayılır', () {
