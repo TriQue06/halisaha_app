@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +11,7 @@ import '../matches/matches_screen.dart';
 import '../pitches/pitches_screen.dart';
 import '../profile/profile_screen.dart';
 import '../teams/match_detail_screen.dart';
+import '../../state/team_providers.dart';
 
 /// Alt navigasyonda seçili sekme.
 ///
@@ -45,6 +48,44 @@ class _MainShellState extends ConsumerState<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushService.consumePendingTap();
     });
+
+    // Canlı yenileme: rakip teklifi kabul edince, skor girince vb. kullanıcı
+    // uygulamadan çıkıp girmeden değişikliği görsün.
+    //  * uygulama arka plandan öne gelince,
+    //  * uygulama açıkken bir push gelince,
+    //  * uygulama açıkken dakikada bir.
+    PushService.onForegroundMessage = _refreshLive;
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        _refreshLive();
+        _startPolling();
+      },
+      onPause: _stopPolling,
+    );
+    _startPolling();
+  }
+
+  AppLifecycleListener? _lifecycle;
+  Timer? _poll;
+
+  void _startPolling() {
+    _poll?.cancel();
+    _poll = Timer.periodic(const Duration(seconds: 60), (_) => _refreshLive());
+  }
+
+  void _stopPolling() {
+    _poll?.cancel();
+    _poll = null;
+  }
+
+  /// Maç ve bildirim verilerini arka planda yeniden çeker. Ekranlar mevcut
+  /// veriyi göstermeye devam eder (yükleniyor ekranına düşmez).
+  void _refreshLive() {
+    if (!mounted) return;
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(pendingMatchesProvider);
+    ref.invalidate(matchHistoryProvider);
+    ref.invalidate(matchDetailProvider);
   }
 
   @override
@@ -52,6 +93,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (PushService.onNotificationTap == _openFromNotification) {
       PushService.onNotificationTap = null;
     }
+    if (PushService.onForegroundMessage == _refreshLive) {
+      PushService.onForegroundMessage = null;
+    }
+    _stopPolling();
+    _lifecycle?.dispose();
     super.dispose();
   }
 

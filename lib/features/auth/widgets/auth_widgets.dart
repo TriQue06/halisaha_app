@@ -116,40 +116,13 @@ class _GoogleGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // Google'ın resmi dört renkli "G" logosu (Sign-In marka kuralları).
+    return Image.asset(
+      'assets/logo/google_g.png',
       width: 20,
       height: 20,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: SweepGradient(
-          colors: <Color>[
-            Color(0xFF4285F4),
-            Color(0xFF34A853),
-            Color(0xFFFBBC05),
-            Color(0xFFEA4335),
-            Color(0xFF4285F4),
-          ],
-        ),
-      ),
-      child: Container(
-        width: 13,
-        height: 13,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.surface,
-        ),
-        child: const Text(
-          'G',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF4285F4),
-            height: 1.1,
-          ),
-        ),
-      ),
+      filterQuality: FilterQuality.medium,
+      excludeFromSemantics: true,
     );
   }
 }

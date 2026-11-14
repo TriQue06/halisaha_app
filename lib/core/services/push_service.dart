@@ -309,7 +309,11 @@ class PushService {
         );
   }
 
+  /// Uygulama açıkken push geldiğinde çağrılır (ekranları yenilemek için).
+  static VoidCallback? onForegroundMessage;
+
   static Future<void> _showForeground(RemoteMessage message) async {
+    onForegroundMessage?.call();
     final RemoteNotification? notification = message.notification;
     if (notification == null) return;
 

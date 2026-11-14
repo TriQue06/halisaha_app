@@ -7,6 +7,7 @@ import '../../core/widgets/legal_consent.dart';
 import '../../state/auth_controller.dart';
 import '../settings/delete_account_dialog.dart';
 import '../shell/main_shell.dart';
+import '../splash/app_bootstrap.dart';
 import 'complete_profile_screen.dart';
 import 'login_screen.dart';
 
@@ -125,9 +126,8 @@ class _AuthLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    // Açılış ekranıyla aynı görünüm: logo + "Japon Kale" (spinner yok).
+    return const BrandLoadingScreen();
   }
 }
 

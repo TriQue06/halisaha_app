@@ -137,8 +137,6 @@ class _SplashView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // Yeşil zemin üzerinde durum çubuğu ikonları beyaz.
       value: SystemUiOverlayStyle.light,
@@ -153,32 +151,7 @@ class _SplashView extends StatelessWidget {
                   opacity: fade,
                   child: SlideTransition(
                     position: slide,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        // Görselde top, kenarlarda boşlukla çiziliyor;
-                        // 180 px'lik kutuda top yaklaşık 95 px görünüyor.
-                        Image.asset(
-                          'assets/icon/app_icon_foreground.png',
-                          width: 180,
-                          height: 180,
-                          filterQuality: FilterQuality.medium,
-                          excludeFromSemantics: true,
-                        ),
-                        Transform.translate(
-                          // Görselin alt boşluğunu kapatıp yazıyı topa yaklaştır.
-                          offset: const Offset(0, -30),
-                          child: Text(
-                            'Japon Kale',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: const BrandMark(),
                   ),
                 ),
               ),
@@ -211,6 +184,67 @@ class _SplashView extends StatelessWidget {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Logo + "Japon Kale" yazısı (açılış animasyonu ve yükleme ekranında ortak).
+class BrandMark extends StatelessWidget {
+  const BrandMark({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        // Görselde top, kenarlarda boşlukla çiziliyor;
+        // 180 px'lik kutuda top yaklaşık 95 px görünüyor.
+        Image.asset(
+          'assets/icon/app_icon_foreground.png',
+          width: 180,
+          height: 180,
+          filterQuality: FilterQuality.medium,
+          excludeFromSemantics: true,
+        ),
+        Transform.translate(
+          // Görselin alt boşluğunu kapatıp yazıyı topa yaklaştır.
+          offset: const Offset(0, -30),
+          child: Text(
+            'Japon Kale',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Açılıştan sonraki bekleme (oturum/profil yükleniyor) ekranı.
+///
+/// Açılış animasyonunun son karesiyle birebir aynı: yeşil zemin, ortada logo
+/// ve yazı. Böylece açılış -> yükleme -> ana sayfa geçişi tek parça görünür;
+/// arada dönen yuvarlaklı boş bir ekran çıkmaz.
+class BrandLoadingScreen extends StatelessWidget {
+  const BrandLoadingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.primaryGreen,
+        body: Center(
+          child: Semantics(
+            label: 'Japon Kale yükleniyor',
+            child: const BrandMark(),
+          ),
         ),
       ),
     );
