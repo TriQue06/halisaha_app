@@ -82,11 +82,11 @@ class _MatchResultScreenState extends ConsumerState<MatchResultScreen> {
         );
         messenger.showSnackBar(
           SnackBar(
-            content: Text(switch ((_myScore - _opponentScore).sign) {
+            content: Text('${switch ((_myScore - _opponentScore).sign) {
               1 => 'Galibiyet kaydedildi. Tebrikler!',
               0 => 'Beraberlik kaydedildi.',
               _ => 'Mağlubiyet kaydedildi.',
-            }),
+            }} Rakip onaylayınca istatistiklere işlenecek.'),
           ),
         );
       } else {

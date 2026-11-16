@@ -8,14 +8,18 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
+import 'core/services/error_reporter.dart';
 import 'core/services/push_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/splash/app_bootstrap.dart';
+import 'features/update/update_gate.dart';
 import 'state/settings_controller.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Yakalanmayan hatalar Supabase'deki client_errors tablosuna yazılır.
+  ErrorReporter.install();
   // Hazırlık (Supabase vb.) artık burada beklenmiyor: arayüz hemen açılır
   // ve açılış animasyonu oynarken [_initializeServices] paralel çalışır.
   runApp(const ProviderScope(child: JaponKaleApp()));
@@ -81,11 +85,11 @@ class JaponKaleApp extends ConsumerWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      // Açılış animasyonu + hazırlık, ardından oturum durumuna göre
-      // giriş / profil tamamlama / ana ekran.
+      // Açılış animasyonu + hazırlık, ardından sürüm kontrolü ve oturum
+      // durumuna göre giriş / profil tamamlama / ana ekran.
       home: const AppBootstrap(
         initialize: _initializeServices,
-        child: AuthGate(),
+        child: UpdateGate(child: AuthGate()),
       ),
     );
   }

@@ -133,6 +133,20 @@ class TeamRepository {
     });
   }
 
+  /// Rakibin girdiği sonucu onaylar ya da itiraz eder (yalnızca diğer
+  /// takımın kaptanı). İtirazda kısa bir not eklenebilir.
+  Future<void> respondToResult({
+    required String matchId,
+    required bool accept,
+    String? reason,
+  }) {
+    return _client.rpc<dynamic>('respond_match_result', params: <String, dynamic>{
+      'p_match_id': matchId,
+      'p_accept': accept,
+      'p_reason': reason,
+    });
+  }
+
   /// Maç bittikten sonra (7 gün içinde) gol/asist girişi ya da düzeltmesi.
   Future<void> savePlayerStats(String matchId, Map<String, PlayerMatchStats> stats) {
     return _client.rpc<dynamic>('save_match_player_stats', params: <String, dynamic>{
@@ -158,6 +172,7 @@ class TeamRepository {
         .select('''
           id, status, match_date, team_size, challenger_score, opponent_score,
           result_reported_at, challenger_team_id, opponent_team_id,
+          result_status, result_reported_team_id, result_dispute_reason,
           challenger:teams!matches_challenger_team_id_fkey(id, name, captain_id),
           opponent:teams!matches_opponent_team_id_fkey(id, name, captain_id),
           pitch:pitches(name),
@@ -196,6 +211,9 @@ class TeamRepository {
       matchDate: parse('match_date'),
       teamSize: (row['team_size'] as num?)?.toInt(),
       reportedAt: parse('result_reported_at'),
+      resultStatus: ResultStatus.parse(row['result_status'] as String?),
+      reportedTeamId: row['result_reported_team_id'] as String?,
+      disputeReason: row['result_dispute_reason'] as String?,
     );
   }
 }

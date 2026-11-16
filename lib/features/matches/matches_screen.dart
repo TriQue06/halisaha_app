@@ -59,6 +59,14 @@ class MatchesScreen extends ConsumerWidget {
       final List<PendingMatch> pending = pendingAsync.valueOrNull ?? const <PendingMatch>[];
       final List<MatchHistoryEntry> history =
           historyAsync.valueOrNull ?? const <MatchHistoryEntry>[];
+      // Rakibin girdiği ve bizim onayımızı bekleyen sonuçlar en üstte.
+      final List<MatchHistoryEntry> toConfirm = history
+          .where((MatchHistoryEntry e) => e.awaitingMyConfirmation)
+          .toList(growable: false);
+
+      void openDetail(String matchId) => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => MatchDetailScreen(matchId: matchId)),
+          );
 
       body = RefreshIndicator(
         onRefresh: refresh,
@@ -66,6 +74,20 @@ class MatchesScreen extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 28),
           children: <Widget>[
+            // --- ONAYINI BEKLEYEN SONUÇLAR ---------------------------
+            if (toConfirm.isNotEmpty) ...<Widget>[
+              const SectionHeader(
+                title: 'Onayını Bekleyen Sonuçlar',
+                subtitle: 'Rakip skoru girdi; onayla ya da itiraz et',
+                icon: Icons.fact_check_outlined,
+              ),
+              for (final MatchHistoryEntry entry in toConfirm)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: MatchHistoryTile(entry: entry, onTap: () => openDetail(entry.id)),
+                ),
+            ],
+
             // --- BEKLEYEN MAÇLAR -------------------------------------
             SectionHeader(
               title: 'Bekleyen Maçlar',
@@ -122,14 +144,7 @@ class MatchesScreen extends ConsumerWidget {
               for (final MatchHistoryEntry entry in history)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: MatchHistoryTile(
-                    entry: entry,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => MatchDetailScreen(matchId: entry.id),
-                      ),
-                    ),
-                  ),
+                  child: MatchHistoryTile(entry: entry, onTap: () => openDetail(entry.id)),
                 ),
           ],
         ),

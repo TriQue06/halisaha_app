@@ -16,6 +16,9 @@ String turkishMatchError(Object error) {
       return 'Bu takımla aramızda zaten devam eden bir maç var. '
           'Önce onu sonuçlandır ya da iptal et.';
     }
+    if (text.contains('yalnizca rakip takimin kaptani onaylayabilir')) {
+      return 'Sonucu yalnızca skoru girmeyen takımın kaptanı onaylayabilir.';
+    }
     if (error.code == '42501' || text.contains('insufficient_privilege')) {
       return 'Bu işlem için yetkin yok. Yalnızca takım kaptanı yapabilir.';
     }
@@ -31,6 +34,9 @@ String turkishMatchError(Object error) {
     if (text.contains('24 saat icinde girmezse')) {
       return 'Skoru önce teklifi gönderen takım girer. Maçtan 24 saat sonra '
           'hâlâ girilmemişse sen girebilirsin.';
+    }
+    if (text.contains('onay bekleyen bir mac sonucu bulunamadi')) {
+      return 'Bu sonuç artık onay beklemiyor; onaylanmış ya da itiraz edilmiş olabilir.';
     }
     if (text.contains('1 saat sonra girilebilir')) {
       return 'Skor, maç saatinden 1 saat sonra girilebilir.';

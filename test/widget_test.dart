@@ -9,6 +9,7 @@ import 'package:japonkale/core/utils/match_errors.dart';
 import 'package:japonkale/features/auth/widgets/auth_widgets.dart';
 import 'package:japonkale/features/home/widgets/todo_section.dart';
 import 'package:japonkale/features/shell/main_shell.dart';
+import 'package:japonkale/features/update/update_gate.dart';
 import 'package:japonkale/models/models.dart';
 import 'package:japonkale/state/app_providers.dart';
 import 'package:japonkale/state/auth_controller.dart';
@@ -379,6 +380,91 @@ void main() {
             message: 'Skoru once teklifi gonderen takim girer; 24 saat icinde girmezse sen girebilirsin')),
         contains('24 saat'),
       );
+    });
+  });
+
+  group('Sonuç onayı', () {
+    MatchDetail detail({
+      ResultStatus status = ResultStatus.pending,
+      String? reportedTeamId = 'team-a',
+      DateTime? reportedAt,
+    }) {
+      return MatchDetail(
+        id: 'm1',
+        status: MatchStatus.completed,
+        pitchName: 'Saha',
+        challenger: const MatchSide(
+            teamId: 'team-a', teamName: 'A', captainId: 'cap-a', lineup: <LineupPlayer>[], score: 3),
+        opponent: const MatchSide(
+            teamId: 'team-b', teamName: 'B', captainId: 'cap-b', lineup: <LineupPlayer>[], score: 1),
+        resultStatus: status,
+        reportedTeamId: reportedTeamId,
+        reportedAt: reportedAt ?? DateTime.now(),
+      );
+    }
+
+    test('sunucu değeri okunur; bilinmeyen/boş değer onaylı sayılır', () {
+      expect(ResultStatus.parse('pending'), ResultStatus.pending);
+      expect(ResultStatus.parse('disputed'), ResultStatus.disputed);
+      expect(ResultStatus.parse('confirmed'), ResultStatus.confirmed);
+      expect(ResultStatus.parse(null), ResultStatus.confirmed);
+    });
+
+    test('skoru girmeyen takımın kaptanı onaylar, giren onaylayamaz', () {
+      final MatchDetail d = detail();
+      expect(d.canRespondToResult('cap-b'), isTrue);
+      expect(d.canRespondToResult('cap-a'), isFalse);
+      expect(d.canRespondToResult(null), isFalse);
+    });
+
+    test('skoru rakip girdiyse onay teklif sahibine düşer', () {
+      final MatchDetail d = detail(reportedTeamId: 'team-b');
+      expect(d.canRespondToResult('cap-a'), isTrue);
+      expect(d.canRespondToResult('cap-b'), isFalse);
+    });
+
+    test('onaylı ya da itirazlı sonuca yeniden yanıt verilemez', () {
+      expect(detail(status: ResultStatus.confirmed).canRespondToResult('cap-b'), isFalse);
+      expect(detail(status: ResultStatus.disputed).canRespondToResult('cap-b'), isFalse);
+    });
+
+    test('otomatik onaya kalan süre 48 saatten geriye sayar', () {
+      final Duration left = detail(
+        reportedAt: DateTime.now().subtract(const Duration(hours: 10)),
+      ).timeLeftToRespond!;
+      expect(left.inHours, inInclusiveRange(37, 38));
+      expect(
+        detail(reportedAt: DateTime.now().subtract(const Duration(hours: 50))).timeLeftToRespond,
+        Duration.zero,
+      );
+    });
+
+    test('maç geçmişi satırı onay alanlarını okur', () {
+      final MatchHistoryEntry e = MatchHistoryEntry.fromRow(<String, dynamic>{
+        'match_id': 'm1',
+        'played_at': '2026-11-10T18:00:00Z',
+        'outcome': 'loss',
+        'result_status': 'pending',
+        'awaiting_my_confirmation': true,
+      });
+      expect(e.resultStatus, ResultStatus.pending);
+      expect(e.awaitingMyConfirmation, isTrue);
+    });
+  });
+
+  group('Zorunlu güncelleme', () {
+    test('sürümler sayı sayı karşılaştırılır', () {
+      expect(isVersionOlder('1.0.6', '1.0.7'), isTrue);
+      expect(isVersionOlder('1.0.7', '1.0.7'), isFalse);
+      expect(isVersionOlder('1.0.10', '1.0.9'), isFalse);
+      expect(isVersionOlder('1.0', '1.0.1'), isTrue);
+      expect(isVersionOlder('1.0.7+12', '1.0.7'), isFalse);
+      expect(isVersionOlder('2.0.0', '1.9.9'), isFalse);
+    });
+
+    test('okunamayan sürüm kullanıcıyı kilitlemez', () {
+      expect(isVersionOlder('abc', '1.0.7'), isFalse);
+      expect(isVersionOlder('1.0.6', ''), isFalse);
     });
   });
 

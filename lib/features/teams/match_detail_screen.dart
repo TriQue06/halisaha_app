@@ -11,6 +11,7 @@ import '../../state/team_providers.dart';
 import '../moderation/report_action_sheet.dart';
 import 'lineup_picker_screen.dart';
 import 'match_result_screen.dart';
+import 'widgets/result_confirmation_card.dart';
 
 /// Maç detayı: skor ve iki takımın hangi kadroyla çıktığı (gol/asistlerle).
 class MatchDetailScreen extends ConsumerWidget {
@@ -109,6 +110,8 @@ class MatchDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              // Sonuç onayı / itiraz (onaylı sonuçta görünmez).
+              ResultConfirmationCard(detail: d, userId: me),
               if (canEditStats) ...<Widget>[
                 const SizedBox(height: 12),
                 OutlinedButton.icon(

@@ -23,6 +23,15 @@ class MatchHistoryTile extends StatelessWidget {
     };
     final String? score = entry.scoreLabel;
 
+    // Onay bekleyen / itiraz edilen sonuç için küçük etiket.
+    final (Color, String)? badge = switch (entry.resultStatus) {
+      ResultStatus.confirmed => null,
+      ResultStatus.disputed => (AppColors.loss, 'İtirazlı · sayılmadı'),
+      ResultStatus.pending => entry.awaitingMyConfirmation
+          ? (AppColors.info, 'Onayın bekleniyor')
+          : (AppColors.draw, 'Onay bekliyor'),
+    };
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -66,6 +75,24 @@ class MatchHistoryTile extends StatelessWidget {
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
+                    if (badge != null) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: badge.$1.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          badge.$2,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: badge.$1,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

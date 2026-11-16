@@ -102,6 +102,15 @@ class TeamActions {
     _afterResult(matchId);
   }
 
+  Future<void> respondToResult({
+    required String matchId,
+    required bool accept,
+    String? reason,
+  }) async {
+    await _repo.respondToResult(matchId: matchId, accept: accept, reason: reason);
+    _afterResult(matchId);
+  }
+
   Future<void> savePlayerStats(String matchId, Map<String, PlayerMatchStats> stats) async {
     await _repo.savePlayerStats(matchId, stats);
     _afterResult(matchId);

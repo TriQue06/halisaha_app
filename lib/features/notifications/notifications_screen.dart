@@ -6,6 +6,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../models/models.dart';
 import '../../state/app_providers.dart';
 import '../shell/main_shell.dart';
+import '../teams/match_detail_screen.dart';
 
 /// Bildirimler ekranı.
 ///
@@ -192,6 +193,18 @@ class _NotificationTile extends ConsumerWidget {
 
     if (!notification.isRead) {
       await ref.read(notificationActionsProvider).markRead(notification.id);
+    }
+
+    // Sonuç bildirimleri (onay iste / onaylandı / itiraz) maç detayını açar;
+    // onay ve itiraz butonları orada.
+    final String? matchId = notification.matchId;
+    if (notification.kind == NotificationKind.matchCompleted &&
+        matchId != null &&
+        matchId.isNotEmpty) {
+      await navigator.push(
+        MaterialPageRoute<void>(builder: (_) => MatchDetailScreen(matchId: matchId)),
+      );
+      return;
     }
 
     // Maçla ilgili bildirimlerde aksiyon "Profilim → Takımım"da alınır.

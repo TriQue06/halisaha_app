@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -74,10 +75,7 @@ class SettingsScreen extends ConsumerWidget {
                 title: const Text('Destek ve geri bildirim'),
                 subtitle: const Text(AppConfig.supportEmail),
                 trailing: const Icon(Icons.mail_outline_rounded, size: 18),
-                onTap: () => openExternalLink(
-                  context,
-                  'mailto:${AppConfig.supportEmail}?subject=Japon%20Kale%20destek',
-                ),
+                onTap: () => _openFeedbackMail(context),
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               ListTile(
@@ -239,6 +237,31 @@ class _TextScaleTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Destek e-postasını sürüm ve platform bilgisi hazır şekilde açar; hata
+/// bildirimlerinde "hangi sürüm, hangi telefon" diye sormaya gerek kalmaz.
+Future<void> _openFeedbackMail(BuildContext context) async {
+  String version = '';
+  try {
+    final PackageInfo info = await PackageInfo.fromPlatform();
+    version = '${info.version} (${info.buildNumber})';
+  } catch (_) {
+    // Sürüm okunamazsa e-posta yine açılsın.
+  }
+  final String platform = switch (defaultTargetPlatform) {
+    TargetPlatform.iOS => 'iOS',
+    TargetPlatform.android => 'Android',
+    _ => defaultTargetPlatform.name,
+  };
+  final String body = '\n\n\n---\nUygulama: Japon Kale $version\nPlatform: $platform';
+  if (!context.mounted) return;
+  await openExternalLink(
+    context,
+    'mailto:${AppConfig.supportEmail}'
+    '?subject=${Uri.encodeComponent('Japon Kale geri bildirim')}'
+    '&body=${Uri.encodeComponent(body)}',
+  );
 }
 
 /// Uygulama sürümü: paket bilgisinden okunur (elle yazılan sürüm

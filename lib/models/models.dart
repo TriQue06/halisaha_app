@@ -30,6 +30,26 @@ enum TeamOutcome {
   final String shortLabel;
 }
 
+/// Girilen maç sonucunun onay durumu (1.0.7).
+///
+/// Bir takım skoru girer, diğer takımın kaptanı onaylar ya da itiraz eder;
+/// 48 saat yanıt gelmezse sonuç otomatik onaylanır. İstatistiklere yalnızca
+/// [confirmed] sonuçlar sayılır.
+enum ResultStatus {
+  pending,
+  confirmed,
+  disputed;
+
+  static ResultStatus parse(String? raw) => switch (raw) {
+        'pending' => ResultStatus.pending,
+        'disputed' => ResultStatus.disputed,
+        _ => ResultStatus.confirmed,
+      };
+}
+
+/// Rakibin sonuca yanıt vermesi için süre; dolunca sonuç otomatik onaylanır.
+const Duration kResultConfirmWindow = Duration(hours: 48);
+
 /// "Bekleyen Maçlar" kartının hangi aksiyonu göstereceğini belirleyen aşama.
 ///
 /// 4 aşamalı onay akışı:
@@ -287,6 +307,8 @@ class MatchHistoryEntry {
     this.opponentScore,
     this.teamSize,
     this.reportedAt,
+    this.resultStatus = ResultStatus.confirmed,
+    this.awaitingMyConfirmation = false,
   });
 
   /// `get_team_match_history` RPC satırı.
@@ -311,6 +333,8 @@ class MatchHistoryEntry {
       opponentScore: (row['opponent_score'] as num?)?.toInt(),
       teamSize: (row['team_size'] as num?)?.toInt(),
       reportedAt: parse('reported_at'),
+      resultStatus: ResultStatus.parse(row['result_status'] as String?),
+      awaitingMyConfirmation: row['awaiting_my_confirmation'] == true,
     );
   }
 
@@ -326,6 +350,12 @@ class MatchHistoryEntry {
   final int? opponentScore;
   final int? teamSize;
   final DateTime? reportedAt;
+
+  /// Sonuç onaylandı mı, onay mı bekliyor, itiraz mı edildi?
+  final ResultStatus resultStatus;
+
+  /// Bu sonucu onaylaması/itiraz etmesi gereken taraf biz miyiz?
+  final bool awaitingMyConfirmation;
 
   /// "3 - 2"; skor girilmemişse null.
   String? get scoreLabel =>
@@ -508,6 +538,9 @@ class MatchDetail {
     this.matchDate,
     this.teamSize,
     this.reportedAt,
+    this.resultStatus = ResultStatus.confirmed,
+    this.reportedTeamId,
+    this.disputeReason,
   });
 
   final String id;
@@ -518,6 +551,39 @@ class MatchDetail {
   final DateTime? matchDate;
   final int? teamSize;
   final DateTime? reportedAt;
+
+  /// Sonucun onay durumu; yalnızca [MatchStatus.completed] maçlarda anlamlı.
+  final ResultStatus resultStatus;
+
+  /// Skoru giren takım (eski maçlarda null: teklif sahibi girmiştir).
+  final String? reportedTeamId;
+
+  /// İtiraz eden kaptanın yazdığı not (varsa).
+  final String? disputeReason;
+
+  /// Skoru giren taraf.
+  MatchSide get reportingSide =>
+      reportedTeamId == opponent.teamId ? opponent : challenger;
+
+  /// Sonucu onaylayacak/itiraz edecek taraf.
+  MatchSide get confirmingSide =>
+      reportedTeamId == opponent.teamId ? challenger : opponent;
+
+  /// Sonuç onay bekliyor mu?
+  bool get isResultPending =>
+      status == MatchStatus.completed && resultStatus == ResultStatus.pending;
+
+  /// [userId] bu sonucu onaylaması gereken kaptan mı?
+  bool canRespondToResult(String? userId) =>
+      isResultPending && userId != null && confirmingSide.captainId == userId;
+
+  /// Otomatik onaya kalan süre (bilinmiyorsa null).
+  Duration? get timeLeftToRespond {
+    final DateTime? at = reportedAt;
+    if (at == null) return null;
+    final Duration left = at.add(kResultConfirmWindow).difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
 
   /// Gol/asist, maç bittikten sonraki 7 gün içinde girilebilir/düzeltilebilir.
   bool get areStatsEditable =>
