@@ -81,6 +81,19 @@ class TeamActions {
     _ref.invalidate(teamRosterProvider(teamId));
   }
 
+  /// Takım adını değiştirir; adın göründüğü tüm listeleri tazeler.
+  Future<void> renameTeam(String teamId, String name) async {
+    await _repo.renameTeam(teamId, name);
+    _ref.invalidate(teamByIdProvider(teamId));
+    _ref.invalidate(myTeamsProvider);
+    _ref.invalidate(teamsForPitchProvider);
+    _ref.invalidate(pitchLeadersProvider);
+    _ref.invalidate(teamHistoryProvider);
+    _ref.invalidate(matchHistoryProvider);
+    _ref.invalidate(pendingMatchesProvider);
+    _ref.invalidate(matchDetailProvider);
+  }
+
   Future<void> setLineup(String matchId, List<String> playerIds) async {
     await _repo.setLineup(matchId, playerIds);
     _ref.invalidate(pendingMatchesProvider);

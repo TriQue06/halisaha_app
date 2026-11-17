@@ -55,7 +55,17 @@ class TeamProfileScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(team.name)),
+      appBar: AppBar(
+        title: Text(team.name),
+        actions: <Widget>[
+          if (isMine)
+            IconButton(
+              tooltip: 'Takım adını değiştir',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => showRenameTeamDialog(context, team),
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: refresh,
         child: ListView(
@@ -130,6 +140,125 @@ class TeamProfileScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Kaptanın takım adını değiştirmesi için pencere.
+Future<void> showRenameTeamDialog(BuildContext context, Team team) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => _RenameTeamDialog(team: team),
+  );
+}
+
+class _RenameTeamDialog extends ConsumerStatefulWidget {
+  const _RenameTeamDialog({required this.team});
+
+  final Team team;
+
+  @override
+  ConsumerState<_RenameTeamDialog> createState() => _RenameTeamDialogState();
+}
+
+class _RenameTeamDialogState extends ConsumerState<_RenameTeamDialog> {
+  late final TextEditingController _name = TextEditingController(text: widget.team.name);
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final String name = _name.text.trim();
+    if (name == widget.team.name) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(teamActionsProvider).renameTeam(widget.team.id, name);
+      navigator.pop();
+      messenger.showSnackBar(SnackBar(content: Text('Takımın adı "$name" oldu.')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = turkishMatchError(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Takım adını değiştir'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            TextFormField(
+              controller: _name,
+              autofocus: true,
+              enabled: !_busy,
+              maxLength: 40,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Takım Adı',
+                prefixIcon: Icon(Icons.shield_outlined),
+              ),
+              validator: (String? value) {
+                if (value == null || value.trim().length < 3) {
+                  return 'Takım adı en az 3 karakter olmalı.';
+                }
+                return null;
+              },
+              onFieldSubmitted: (_) => _save(),
+            ),
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 4),
+            Text(
+              'Yeni ad sahadaki takım listesinde, maç geçmişinde ve '
+              'krallık tablosunda hemen görünür.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: _busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Kaydet'),
+        ),
+      ],
     );
   }
 }

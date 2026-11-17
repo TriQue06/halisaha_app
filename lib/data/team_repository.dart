@@ -43,6 +43,18 @@ class TeamRepository {
     });
   }
 
+  /// Takımın adını değiştirir (yalnızca kaptan; RLS kontrol eder).
+  /// Sunucu uygunsuz kelime filtresini ve "aynı sahada aynı isim olmaz"
+  /// kuralını uygular. Güncellenen satır yoksa (kaptan değilse) hata fırlatır.
+  Future<void> renameTeam(String teamId, String name) async {
+    await _client
+        .from('teams')
+        .update(<String, dynamic>{'name': name.trim()})
+        .eq('id', teamId)
+        .select('id')
+        .single();
+  }
+
   /// Takım profili başlığı. Engellenen/banlanan kullanıcının takımı için null.
   Future<Team?> fetchTeam(String teamId) async {
     final Map<String, dynamic>? row = await _client
